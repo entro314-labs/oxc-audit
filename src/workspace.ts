@@ -2,6 +2,7 @@ import { readdir } from 'node:fs/promises'
 import { join, relative, resolve } from 'node:path'
 
 import { isPathNotFoundError } from './fs-utils.js'
+import { matchesDeclaration, readWorkspaceDeclaration } from './workspace-globs.js'
 
 /** Directories that never contain workspace packages worth auditing. */
 const SKIPPED_DIRECTORIES = new Set([
@@ -30,22 +31,39 @@ export interface WorkspacePackage {
   relativeDir: string
 }
 
+export interface WorkspaceDiscovery {
+  packages: WorkspacePackage[]
+  /** The file the package globs came from, when the workspace declared them. */
+  declaredIn: string | undefined
+  /** Packages found on disk but excluded by the workspace declaration. */
+  excluded: WorkspacePackage[]
+}
+
 /**
  * Finds the packages inside a workspace root.
  *
- * Deliberately convention-agnostic: rather than parsing four different workspace
- * declarations (`package.json` workspaces, `pnpm-workspace.yaml`, `lerna.json`, `nx.json`,
- * each with its own glob dialect and one requiring a YAML parser), this treats "a
- * directory containing a package.json" as the definition of a package. That is a fact on
- * disk rather than a declaration to interpret, and it holds for every convention at once.
+ * Discovery walks for `package.json`, which works regardless of which workspace
+ * convention a repo uses. When the repo *declares* its packages, that declaration then
+ * filters the result — including its exclusions.
  *
- * The trade-off is that a package outside the declared globs is still found. Auditing it
- * is useful anyway — it is a real package with real source files.
+ * Honouring exclusions is the point. A repo can keep a package out of its workspace
+ * deliberately (a React Native app that must own its own dependency graph, for instance,
+ * carrying its own lockfile). Auditing it anyway would write config into a package the
+ * repo has explicitly set apart, which is exactly the unrequested change this tool avoids
+ * everywhere else.
  */
 export async function findWorkspacePackages(
   rootDir: string,
   options: { maxDepth?: number } = {},
 ): Promise<WorkspacePackage[]> {
+  return (await discoverWorkspace(rootDir, options)).packages
+}
+
+/** Like {@link findWorkspacePackages}, but reports what was excluded and why. */
+export async function discoverWorkspace(
+  rootDir: string,
+  options: { maxDepth?: number } = {},
+): Promise<WorkspaceDiscovery> {
   const root = resolve(rootDir)
   const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH
   const found: WorkspacePackage[] = []
@@ -85,5 +103,25 @@ export async function findWorkspacePackages(
   await walk(root, 0)
 
   // Sorted so a run is reproducible regardless of filesystem enumeration order.
-  return found.sort((left, right) => left.relativeDir.localeCompare(right.relativeDir))
+  found.sort((left, right) => left.relativeDir.localeCompare(right.relativeDir))
+
+  const declaration = await readWorkspaceDeclaration(root)
+
+  if (!declaration) {
+    return { packages: found, declaredIn: undefined, excluded: [] }
+  }
+
+  const packages: WorkspacePackage[] = []
+  const excluded: WorkspacePackage[] = []
+
+  for (const workspacePackage of found) {
+    if (matchesDeclaration(workspacePackage.relativeDir, declaration)) {
+      packages.push(workspacePackage)
+      continue
+    }
+
+    excluded.push(workspacePackage)
+  }
+
+  return { packages, declaredIn: declaration.source, excluded }
 }

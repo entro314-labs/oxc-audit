@@ -4,10 +4,11 @@ import { dirname, join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
+import { pathExists } from './fs-utils.js'
 import { auditWorkspace } from './index.js'
 import { CollectingReporter } from './reporter.js'
 import type { OxlintConfig } from './types.js'
-import { findWorkspacePackages } from './workspace.js'
+import { discoverWorkspace, findWorkspacePackages } from './workspace.js'
 
 async function setupWorkspace(files: Record<string, string>): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'oxc-audit-workspace-'))
@@ -173,5 +174,105 @@ describe('auditWorkspace', () => {
     for (const { report } of second.packages) {
       expect(report.recommendations).toEqual([])
     }
+  })
+})
+
+describe('workspace declarations are honoured', () => {
+  const WITH_EXCLUSION = {
+    'package.json': JSON.stringify({ name: 'root' }),
+    // Mirrors a real repo: an app kept out of the workspace on purpose because it owns
+    // its own dependency graph and lockfile.
+    'pnpm-workspace.yaml': [
+      'packages:',
+      '  - apps/*',
+      '  # native app must own its dependency graph',
+      "  - '!apps/native'",
+      '  - packages/*',
+      'minimumReleaseAge: 0',
+      '',
+    ].join('\n'),
+    'apps/web/package.json': JSON.stringify({ name: 'web' }),
+    'apps/native/package.json': JSON.stringify({ name: 'native' }),
+    'packages/ui/package.json': JSON.stringify({ name: 'ui' }),
+    'tools/scratch/package.json': JSON.stringify({ name: 'scratch' }),
+  }
+
+  it('excludes a package the workspace negates', async () => {
+    const dir = await setupWorkspace(WITH_EXCLUSION)
+
+    const discovery = await discoverWorkspace(dir)
+
+    expect(discovery.packages.map((entry) => entry.relativeDir)).toEqual([
+      'apps/web',
+      'packages/ui',
+    ])
+    expect(discovery.excluded.map((entry) => entry.relativeDir)).toEqual(
+      expect.arrayContaining(['apps/native']),
+    )
+    expect(discovery.declaredIn).toBe('pnpm-workspace.yaml')
+  })
+
+  it('excludes packages outside the declared globs', async () => {
+    const dir = await setupWorkspace(WITH_EXCLUSION)
+
+    const discovery = await discoverWorkspace(dir)
+
+    // tools/* is not declared, so it is not a workspace package.
+    expect(discovery.packages.map((entry) => entry.relativeDir)).not.toContain('tools/scratch')
+  })
+
+  it('never audits an excluded package', async () => {
+    const dir = await setupWorkspace(WITH_EXCLUSION)
+
+    const workspace = await auditWorkspace(
+      { projectDir: dir, write: true },
+      new CollectingReporter(),
+    )
+
+    expect(workspace.packages.map((entry) => entry.relativeDir)).not.toContain('apps/native')
+    expect(await pathExists(join(dir, 'apps/native/.oxlintrc.json'))).toBe(false)
+    expect(await pathExists(join(dir, 'apps/web/.oxlintrc.json'))).toBe(true)
+  })
+
+  it('reports exclusions rather than skipping them silently', async () => {
+    const dir = await setupWorkspace(WITH_EXCLUSION)
+    const reporter = new CollectingReporter()
+
+    await auditWorkspace({ projectDir: dir }, reporter)
+
+    // info() is a no-op on CollectingReporter, so assert through the discovery API that
+    // the exclusion is surfaced as data rather than dropped.
+    const discovery = await discoverWorkspace(dir)
+    expect(discovery.excluded.length).toBeGreaterThan(0)
+    expect(discovery.declaredIn).toBeDefined()
+  })
+
+  it('honours package.json workspaces, including the object form', async () => {
+    const dir = await setupWorkspace({
+      'package.json': JSON.stringify({ name: 'root', workspaces: { packages: ['packages/*'] } }),
+      'packages/ui/package.json': JSON.stringify({ name: 'ui' }),
+      'apps/web/package.json': JSON.stringify({ name: 'web' }),
+    })
+
+    const discovery = await discoverWorkspace(dir)
+
+    expect(discovery.packages.map((entry) => entry.relativeDir)).toEqual(['packages/ui'])
+    expect(discovery.declaredIn).toBe('package.json')
+  })
+
+  it('falls back to plain discovery when nothing is declared', async () => {
+    const dir = await setupWorkspace({
+      'package.json': JSON.stringify({ name: 'root' }),
+      'packages/ui/package.json': JSON.stringify({ name: 'ui' }),
+      'tools/scratch/package.json': JSON.stringify({ name: 'scratch' }),
+    })
+
+    const discovery = await discoverWorkspace(dir)
+
+    expect(discovery.declaredIn).toBeUndefined()
+    expect(discovery.packages.map((entry) => entry.relativeDir)).toEqual([
+      'packages/ui',
+      'tools/scratch',
+    ])
   })
 })

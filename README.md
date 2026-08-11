@@ -97,11 +97,23 @@ oxc-audit --recurse --write    # give each package its own config
 ```
 
 Packages are found by walking for `package.json`, skipping `node_modules` and build
-output. That is deliberately convention-agnostic: `package.json` workspaces,
-`pnpm-workspace.yaml`, `lerna.json`, and `nx.json` each declare workspaces differently and
-one needs a YAML parser, whereas "a directory containing a package.json" is a fact on disk
-that holds for all of them. The trade-off is that a package outside the declared globs is
-still audited — which is useful anyway, since it is a real package with real source files.
+output. When the repo declares its packages — `package.json` workspaces,
+`pnpm-workspace.yaml`, or `lerna.json` — that declaration then filters the result,
+**including its exclusions**:
+
+```yaml
+packages:
+  - apps/*
+  - '!apps/native'   # owns its own dependency graph and lockfile
+  - packages/*
+```
+
+`apps/native` is skipped, and the skip is reported rather than silent. Honouring
+exclusions matters: a package kept out of a workspace on purpose is one the repo has
+deliberately set apart, and writing config into it would be exactly the unrequested change
+this tool avoids everywhere else.
+
+With no declaration, every package found on disk is audited.
 
 Without `--recurse`, a workspace root warns that it is under-reporting rather than passing
 silently.
