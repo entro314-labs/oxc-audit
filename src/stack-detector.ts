@@ -62,6 +62,11 @@ type PackageManifest = z.infer<typeof PackageManifestSchema>
  */
 const CONFIG_FILE_SIGNALS: Array<{ id: StackSignalId; files: string[] }> = [
   { id: 'typescript', files: ['tsconfig.json', 'tsconfig.base.json'] },
+  // Tracked separately from `typescript`: type-aware linting needs a real tsconfig, not
+  // just TypeScript source files.
+  { id: 'tsconfig', files: ['tsconfig.json'] },
+  { id: 'svelte', files: ['svelte.config.js', 'svelte.config.ts', 'svelte.config.mjs'] },
+  { id: 'astro', files: ['astro.config.mjs', 'astro.config.ts', 'astro.config.js'] },
   {
     id: 'nextjs',
     files: ['next.config.js', 'next.config.mjs', 'next.config.ts', 'next.config.mts'],
@@ -72,6 +77,9 @@ const CONFIG_FILE_SIGNALS: Array<{ id: StackSignalId; files: string[] }> = [
     files: ['vitest.config.ts', 'vitest.config.js', 'vitest.config.mts', 'vitest.workspace.ts'],
   },
   { id: 'jest', files: ['jest.config.js', 'jest.config.ts', 'jest.config.mjs', 'jest.config.cjs'] },
+  // `package.json#workspaces` is only one of several conventions; pnpm, Lerna and Nx each
+  // declare a workspace somewhere else entirely.
+  { id: 'monorepo', files: ['pnpm-workspace.yaml', 'pnpm-workspace.yml', 'lerna.json', 'nx.json'] },
 ]
 
 /** Dependency names that establish a signal, matched exactly. */
@@ -85,6 +93,11 @@ const DEPENDENCY_SIGNALS: Array<{ id: StackSignalId; packages: string[] }> = [
   { id: 'jest', packages: ['jest', '@jest/globals'] },
   { id: 'node', packages: ['@types/node'] },
   { id: 'jsdoc', packages: ['jsdoc', 'typedoc'] },
+  { id: 'svelte', packages: ['svelte'] },
+  { id: 'astro', packages: ['astro'] },
+  // The engine behind Oxlint's type-aware rules. Without it `oxlint --type-aware` fails
+  // with "Failed to find tsgolint executable", so its presence gates those rules.
+  { id: 'tsgolint', packages: ['oxlint-tsgolint'] },
 ]
 
 /** Extensions that establish a signal by their presence in the source tree. */
@@ -92,6 +105,8 @@ const EXTENSION_SIGNALS: Array<{ id: StackSignalId; extensions: string[] }> = [
   { id: 'typescript', extensions: ['.ts', '.tsx', '.mts', '.cts'] },
   { id: 'jsx', extensions: ['.jsx', '.tsx'] },
   { id: 'vue', extensions: ['.vue'] },
+  { id: 'svelte', extensions: ['.svelte'] },
+  { id: 'astro', extensions: ['.astro'] },
 ]
 
 /**
@@ -128,6 +143,14 @@ export async function detectStack(
 
   const scan = await scanSourceTree(resolvedDir, options.maxFiles ?? DEFAULT_MAX_FILES)
   collectExtensionSignals(scan.extensions, addEvidence)
+
+  // Dependency signals come from one manifest. In a workspace root the frameworks live in
+  // the leaf packages, so a root-level audit under-reports and the user needs to know.
+  if (evidenceBySignal.has('monorepo')) {
+    reporter.warn(
+      'This looks like a workspace root. Dependency signals come from the root manifest only, so frameworks used in individual packages will be missed. Run the audit per package with --dir, or keep a config per package.',
+    )
+  }
 
   if (scan.truncated) {
     reporter.warn(

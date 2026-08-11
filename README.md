@@ -65,14 +65,49 @@ Those invariants are asserted directly, over a matrix of existing configs, in
 | `react` / `react-dom` | the corresponding dependency                                                  |
 | `nextjs`              | `next` dependency or `next.config.*`                                          |
 | `vue`                 | `vue`/`nuxt` dependency, `vue.config.*`/`nuxt.config.*`, or `.vue` files      |
+| `svelte`              | `svelte` dependency, `svelte.config.*`, or `.svelte` files                    |
+| `astro`               | `astro` dependency, `astro.config.*`, or `.astro` files                       |
 | `vitest` / `jest`     | the dependency or its config file                                             |
 | `node`                | `@types/node`, `engines.node`, or a `bin` field                               |
 | `esm`                 | `"type": "module"`                                                            |
-| `monorepo`            | a `workspaces` field                                                          |
+| `monorepo`            | `workspaces`, `pnpm-workspace.yaml`, `lerna.json`, or `nx.json`               |
+| `tsconfig`            | `tsconfig.json` (tracked separately — type-aware linting needs a real one)    |
+| `tsgolint`            | `oxlint-tsgolint` dependency                                                  |
 | `jsdoc`               | `jsdoc` or `typedoc` dependency                                               |
 
 Dependencies are read from `dependencies`, `devDependencies`, and `peerDependencies`, so a
 monorepo leaf package that inherits a framework is still detected.
+
+Oxlint parses `.vue`, `.svelte`, and `.astro` and lints their script blocks with its
+universal rules, but ships a dedicated plugin only for Vue. Svelte and Astro are still
+detected, and the missing plugin is reported rather than silently producing nothing.
+
+**Workspace roots.** Dependency signals come from one manifest. In a workspace root the
+frameworks live in the leaf packages, so a root-level audit under-reports — the tool says
+so and suggests running per package with `--dir`.
+
+## Type-aware rules
+
+Oxlint's type-aware rules run on the tsgolint engine, shipped separately as
+`oxlint-tsgolint`. Without it, `oxlint --type-aware` fails with _"Failed to find tsgolint
+executable"_.
+
+So type-aware rules are recommended **only when `oxlint-tsgolint` is already a
+dependency**. Writing `options.typeAware` without the engine would produce a config the
+project cannot run. When a `tsconfig.json` is present but the engine is not, the
+capability is reported as a prerequisite instead:
+
+```
+Available with an extra install
+  Type-aware linting
+      3 type-aware rules (including no-floating-promises) need type information,
+      which Oxlint gets from the tsgolint engine.
+      pnpm add -D oxlint-tsgolint
+```
+
+Recommended type-aware rules are checked against `docs/tsgolint-rules.tsv` **including its
+`status` column**, so a rule tsgolint has not implemented yet can never be recommended —
+that would configure something which silently never runs.
 
 ## Usage
 
@@ -142,10 +177,14 @@ pnpm build    # bundle, plus publint and arethetypeswrong gates
 ```
 
 The test suite includes a conformance layer that runs the real `oxlint` binary against
-generated configs — checking they load, that the plugins claimed are actually enabled, and
-that no previously-active plugin gets disabled. Recommended rule and plugin names are
-checked against the tracked inventory in `docs/oxlint-rules.tsv`, so a rename in Oxlint
-fails the suite rather than shipping a config that references a rule that no longer exists.
+generated configs. It checks that configs load, that the plugins claimed are actually
+enabled, that no previously-active plugin gets disabled, that `.vue`/`.svelte`/`.astro`
+files are genuinely linted rather than silently skipped, and that type-aware rules
+actually fire through the tsgolint engine.
+
+Recommended rule and plugin names are checked against the tracked inventories in
+`docs/oxlint-rules.tsv` and `docs/tsgolint-rules.tsv`, so a rename upstream fails the
+suite rather than shipping a config referencing a rule that no longer exists.
 
 ## License
 

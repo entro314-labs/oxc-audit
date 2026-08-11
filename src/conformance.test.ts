@@ -146,3 +146,158 @@ describe('generated configs load in the real Oxlint', () => {
     expect(merged.ignorePatterns).toEqual(['dist/**'])
   })
 })
+
+/**
+ * Oxlint parses `.vue`, `.svelte` and `.astro` and applies its universal rules to the
+ * script blocks, but ships a dedicated plugin only for Vue. These fixtures prove the
+ * files are genuinely in scope rather than silently skipped, which is the difference
+ * between a config that lints a Svelte app and one that quietly lints nothing.
+ */
+const FRAMEWORK_FIXTURES = [
+  {
+    name: 'Vue',
+    signal: 'vue',
+    manifest: { name: 'app', dependencies: { vue: '^3.4.0' } },
+    file: 'src/App.vue',
+    contents: '<script setup>\ndebugger\n</script>\n<template><div /></template>\n',
+    expectsPlugin: 'vue',
+  },
+  {
+    name: 'Svelte',
+    signal: 'svelte',
+    manifest: { name: 'app', dependencies: { svelte: '^5.0.0' } },
+    file: 'src/App.svelte',
+    contents: '<script>\ndebugger\n</script>\n<div />\n',
+    expectsPlugin: undefined,
+  },
+  {
+    name: 'Astro',
+    signal: 'astro',
+    manifest: { name: 'app', dependencies: { astro: '^5.0.0' } },
+    file: 'src/index.astro',
+    contents: '---\ndebugger\n---\n<div />\n',
+    expectsPlugin: undefined,
+  },
+] as const
+
+describe('framework file types are genuinely linted', () => {
+  for (const fixture of FRAMEWORK_FIXTURES) {
+    it(`detects ${fixture.name} and produces a config that lints its files`, async () => {
+      const dir = await setupProject({
+        'package.json': JSON.stringify(fixture.manifest),
+        [fixture.file]: fixture.contents,
+      })
+
+      const report = await audit({ projectDir: dir, write: true })
+
+      expect(report.stack.signals.map((signal) => signal.id)).toContain(fixture.signal)
+
+      const { stdout, stderr } = await run(['--config', '.oxlintrc.json', '.'], dir)
+      const output = `${stdout}${stderr}`
+
+      expect(output).not.toContain('Failed to parse')
+      // The `debugger` inside the framework file must actually be reported, which only
+      // happens if Oxlint parsed the file rather than skipping it.
+      expect(output).toContain('no-debugger')
+      expect(output).toContain(fixture.file.split('/').at(-1))
+    })
+
+    it(`${fixture.name}: recommends only plugins Oxlint actually ships for it`, async () => {
+      const dir = await setupProject({
+        'package.json': JSON.stringify(fixture.manifest),
+        [fixture.file]: fixture.contents,
+      })
+
+      const report = await audit({ projectDir: dir })
+      const plugins = report.recommendations
+        .filter((entry) => entry.kind === 'plugin')
+        .map((entry) => entry.target)
+      const capabilities = report.prerequisites.map((entry) => entry.capability.toLowerCase())
+
+      // Vue has a plugin, so it is recommended. Svelte and Astro do not, so the gap is
+      // reported as a prerequisite rather than silently producing nothing.
+      expect(fixture.expectsPlugin ? plugins : capabilities).toContain(
+        fixture.expectsPlugin ?? `${fixture.name.toLowerCase()}-specific rules`,
+      )
+    })
+  }
+})
+
+describe('type-aware linting', () => {
+  const TYPE_AWARE_PROJECT = {
+    'package.json': JSON.stringify({
+      name: 'app',
+      type: 'module',
+      devDependencies: { typescript: '^5.0.0', 'oxlint-tsgolint': '^7.0.2001' },
+    }),
+    'tsconfig.json': JSON.stringify({ compilerOptions: { strict: true } }),
+    // `await` on a number violates typescript/await-thenable, which needs type information.
+    'src/a.ts': 'export async function f() {\n  const n = 1\n  await n\n  return n\n}\n',
+  }
+
+  it('enables type-aware rules when oxlint-tsgolint is installed', async () => {
+    const dir = await setupProject(TYPE_AWARE_PROJECT)
+
+    const report = await audit({ projectDir: dir, write: true })
+    const config = JSON.parse(await readFile(join(dir, '.oxlintrc.json'), 'utf-8')) as {
+      options?: { typeAware?: boolean }
+      rules?: Record<string, string>
+    }
+
+    expect(config.options?.typeAware).toBe(true)
+    expect(config.rules?.['typescript/await-thenable']).toBe('error')
+    expect(report.prerequisites.map((entry) => entry.capability)).not.toContain(
+      'Type-aware linting',
+    )
+  })
+
+  it('produces a config whose type-aware rules actually fire', async () => {
+    const dir = await setupProject(TYPE_AWARE_PROJECT)
+
+    await audit({ projectDir: dir, write: true })
+    const { stdout, stderr } = await run(['--config', '.oxlintrc.json', '--type-aware', '.'], dir)
+    const output = `${stdout}${stderr}`
+
+    // Proves the engine resolved and the rule ran, not just that the JSON looked right.
+    expect(output).not.toContain('Failed to find tsgolint')
+    expect(output).toContain('await-thenable')
+  })
+
+  it('reports type-aware as a prerequisite instead of configuring it when the engine is absent', async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({ name: 'app', devDependencies: { typescript: '^5.0.0' } }),
+      'tsconfig.json': JSON.stringify({ compilerOptions: { strict: true } }),
+      'src/a.ts': 'export const a = 1\n',
+    })
+
+    const report = await audit({ projectDir: dir, write: true })
+    const config = JSON.parse(await readFile(join(dir, '.oxlintrc.json'), 'utf-8')) as {
+      options?: { typeAware?: boolean }
+      rules?: Record<string, string>
+    }
+
+    // Writing typeAware without the engine would make `oxlint --type-aware` fail.
+    expect(config.options?.typeAware).toBeUndefined()
+    expect(config.rules?.['typescript/await-thenable']).toBeUndefined()
+
+    const prerequisite = report.prerequisites.find(
+      (entry) => entry.capability === 'Type-aware linting',
+    )
+    expect(prerequisite?.install).toBe('pnpm add -D oxlint-tsgolint')
+  })
+
+  it('respects an explicit typeAware: false as a decision', async () => {
+    const dir = await setupProject({
+      ...TYPE_AWARE_PROJECT,
+      '.oxlintrc.json': `${JSON.stringify({ options: { typeAware: false } }, null, 2)}\n`,
+    })
+
+    const report = await audit({ projectDir: dir, write: true })
+    const config = JSON.parse(await readFile(join(dir, '.oxlintrc.json'), 'utf-8')) as {
+      options?: { typeAware?: boolean }
+    }
+
+    expect(config.options?.typeAware).toBe(false)
+    expect(report.explicitlyDisabled.map((entry) => entry.target)).toContain('typeAware')
+  })
+})

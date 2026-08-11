@@ -157,3 +157,42 @@ describe('detectStack', () => {
     expect(second.sourceExtensions).toEqual(first.sourceExtensions)
   })
 })
+
+describe('detectStack — workspace roots', () => {
+  it('detects a pnpm workspace, which declares itself outside package.json', async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({ name: 'root' }),
+      'pnpm-workspace.yaml': "packages:\n  - 'packages/*'\n",
+    })
+
+    const stack = await detectStack(dir, new CollectingReporter())
+
+    expect(hasSignal(stack, 'monorepo')).toBe(true)
+  })
+
+  it('detects Lerna and Nx workspaces', async () => {
+    for (const marker of ['lerna.json', 'nx.json']) {
+      const dir = await setupProject({
+        'package.json': JSON.stringify({ name: 'root' }),
+        [marker]: '{}',
+      })
+
+      const stack = await detectStack(dir, new CollectingReporter())
+
+      expect(hasSignal(stack, 'monorepo')).toBe(true)
+    }
+  })
+
+  it('warns that a workspace root under-reports its packages', async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({ name: 'root' }),
+      'pnpm-workspace.yaml': "packages:\n  - 'packages/*'\n",
+      'packages/app/src/App.tsx': 'export default () => null\n',
+    })
+    const reporter = new CollectingReporter()
+
+    await detectStack(dir, reporter)
+
+    expect(reporter.getWarnings().some((warning) => warning.includes('workspace root'))).toBe(true)
+  })
+})

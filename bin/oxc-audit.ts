@@ -171,6 +171,18 @@ function formatReport(report: AuditReport, write: boolean): string {
     lines.push(...report.explicitlyDisabled.map((entry) => `  ${pc.dim(formatTarget(entry))}`), '')
   }
 
+  if (report.prerequisites.length > 0) {
+    lines.push(pc.bold('Available with an extra install'))
+    for (const prerequisite of report.prerequisites) {
+      lines.push(
+        `  ${pc.cyan(prerequisite.capability)}`,
+        `      ${pc.dim(prerequisite.reason)}`,
+        `      ${prerequisite.install}`,
+      )
+    }
+    lines.push('')
+  }
+
   if (report.blockers.length > 0) {
     lines.push(pc.bold(pc.magenta('Blocked')))
     lines.push(...report.blockers.map((blocker) => `  ${blocker}`), '')

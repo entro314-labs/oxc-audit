@@ -3,6 +3,7 @@ import type {
   OxlintBuiltinPlugin,
   OxlintCategory,
   OxlintSeverity,
+  Prerequisite,
   ProjectStack,
   Recommendation,
   StackSignalId,
@@ -161,6 +162,36 @@ const TARGETED_RULES: Array<{
 ]
 
 /**
+ * Type-aware rules, which run on Oxlint's tsgolint engine.
+ *
+ * Gated on the `tsgolint` signal rather than merely on TypeScript: without the
+ * `oxlint-tsgolint` package, `oxlint --type-aware` fails with "Failed to find tsgolint
+ * executable", so configuring these without it would produce a config the project cannot
+ * run. When TypeScript is present but tsgolint is not, the capability is surfaced as a
+ * prerequisite instead.
+ *
+ * Every rule here is checked against docs/tsgolint-rules.tsv, including its
+ * `implemented` status, by the inventory conformance test.
+ */
+const TYPE_AWARE_RULES: Array<{ rule: string; severity: OxlintSeverity; reason: string }> = [
+  {
+    rule: 'typescript/no-floating-promises',
+    severity: 'error',
+    reason: 'An unawaited promise swallows its rejection, turning a failure into silence.',
+  },
+  {
+    rule: 'typescript/await-thenable',
+    severity: 'error',
+    reason: 'Awaiting a non-promise is always a mistake and usually hides a missing call.',
+  },
+  {
+    rule: 'typescript/no-misused-promises',
+    severity: 'error',
+    reason: 'Passing an async function where a void callback is expected drops its errors.',
+  },
+]
+
+/**
  * Builds the full set of recommendations for a stack.
  *
  * This is a pure function of the stack: the same signals always produce the same
@@ -195,12 +226,69 @@ export function recommendForStack(stack: ProjectStack): Recommendation[] {
     }
   }
 
+  if (hasSignal(stack, 'tsgolint') && hasSignal(stack, 'tsconfig')) {
+    recommendations.push({
+      kind: 'option',
+      target: 'typeAware',
+      reason:
+        'oxlint-tsgolint is installed, so the type-aware rules can run; the option has to be on for Oxlint to load them.',
+      triggeredBy: ['tsgolint', 'tsconfig'],
+    })
+
+    for (const { rule, severity, reason } of TYPE_AWARE_RULES) {
+      recommendations.push({
+        kind: 'rule',
+        target: rule,
+        severity,
+        reason,
+        triggeredBy: ['tsgolint'],
+      })
+    }
+  }
+
   return recommendations
+}
+
+/**
+ * Capabilities the project could adopt but has not installed the tooling for.
+ *
+ * Reported instead of configured: writing type-aware config without the engine would
+ * produce a config that fails at run time.
+ */
+export function findPrerequisites(stack: ProjectStack): Prerequisite[] {
+  const prerequisites: Prerequisite[] = []
+
+  if (hasSignal(stack, 'tsconfig') && !hasSignal(stack, 'tsgolint')) {
+    prerequisites.push({
+      capability: 'Type-aware linting',
+      reason: `${TYPE_AWARE_RULES.length} type-aware rules (including no-floating-promises) need type information, which Oxlint gets from the tsgolint engine.`,
+      install: 'pnpm add -D oxlint-tsgolint',
+    })
+  }
+
+  // Oxlint parses these files and applies its universal rules, but ships no dedicated
+  // plugin for either, so there is nothing framework-specific to recommend.
+  for (const framework of ['svelte', 'astro'] as const) {
+    if (hasSignal(stack, framework)) {
+      prerequisites.push({
+        capability: `${framework === 'svelte' ? 'Svelte' : 'Astro'}-specific rules`,
+        reason: `Oxlint lints the script blocks in .${framework} files with its universal rules, but ships no ${framework} plugin, so no framework-specific rules are available yet.`,
+        install: '(nothing to install — tracked upstream)',
+      })
+    }
+  }
+
+  return prerequisites
+}
+
+/** Type-aware rule names this recommender can emit, for tsgolint inventory checks. */
+export function getTypeAwareRuleNames(): string[] {
+  return TYPE_AWARE_RULES.map(({ rule }) => rule)
 }
 
 /** Every Oxlint rule name this recommender can emit, for inventory conformance checks. */
 export function getRecommendableRuleNames(): string[] {
-  return TARGETED_RULES.map(({ rule }) => rule)
+  return [...TARGETED_RULES.map(({ rule }) => rule), ...TYPE_AWARE_RULES.map(({ rule }) => rule)]
 }
 
 /** Every plugin this recommender can enable. */

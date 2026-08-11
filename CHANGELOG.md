@@ -31,3 +31,15 @@ Initial release.
 - Inventory conformance: recommended rule and plugin names are checked against
   `docs/oxlint-rules.tsv`.
 - `publint` and `arethetypeswrong` (`esm-only`) run on every build.
+- Svelte and Astro detection. Oxlint lints their script blocks with universal rules but
+  ships no dedicated plugin, so the gap is reported as a prerequisite rather than silently
+  producing nothing.
+- Type-aware rule support, gated on the `oxlint-tsgolint` dependency. Without the engine
+  `oxlint --type-aware` fails outright, so the capability is reported as a prerequisite
+  instead of being written into a config the project could not run. Recommended type-aware
+  rules are validated against the `status` column of `docs/tsgolint-rules.tsv`.
+- Workspace detection covers `pnpm-workspace.yaml`, `lerna.json`, and `nx.json` alongside
+  `package.json#workspaces`, and a workspace root warns that dependency signals come from
+  the root manifest only.
+- Conformance fixtures exercising `.vue`, `.svelte`, and `.astro` against the real Oxlint
+  binary, asserting the files are actually parsed rather than skipped.

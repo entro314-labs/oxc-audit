@@ -77,6 +77,10 @@ function applyRecommendation(config: OxlintConfig, recommendation: Recommendatio
     return applyPlugin(config, recommendation.target as OxlintBuiltinPlugin)
   }
 
+  if (recommendation.kind === 'option') {
+    return applyOption(config, recommendation.target)
+  }
+
   if (recommendation.kind === 'category') {
     return applyCategory(
       config,
@@ -98,6 +102,24 @@ function applyPlugin(config: OxlintConfig, plugin: OxlintBuiltinPlugin): ApplyOu
 
   // Carry the base set so writing the field does not disable what was implicitly on.
   config.plugins = [...new Set([...OXLINT_DEFAULT_PLUGINS, ...enabledPlugins, plugin])].sort()
+
+  return 'applied'
+}
+
+function applyOption(config: OxlintConfig, option: string): ApplyOutcome {
+  const key = option as keyof NonNullable<OxlintConfig['options']>
+  const existing = config.options?.[key]
+
+  // An explicit `false` is a decision to keep the capability off.
+  if (existing === false) {
+    return 'disabled'
+  }
+
+  if (existing === true) {
+    return 'satisfied'
+  }
+
+  config.options = { ...config.options, [key]: true }
 
   return 'applied'
 }
