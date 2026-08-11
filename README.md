@@ -225,6 +225,20 @@ Recommended rule and plugin names are checked against the tracked inventories in
 `docs/oxlint-rules.tsv` and `docs/tsgolint-rules.tsv`, so a rename upstream fails the
 suite rather than shipping a config referencing a rule that no longer exists.
 
+### Releasing
+
+Bump the version in `package.json`, add the matching `## [x.y.z]` section to
+`CHANGELOG.md`, then:
+
+```bash
+pnpm release --dry-run   # run every check and pack the tarball, changing nothing
+pnpm release             # publish to npm, tag the version, open the GitHub release
+```
+
+The release notes are the CHANGELOG section for that exact version. npm credentials,
+`gh` auth, an `origin` remote, and an unused tag are all verified before anything is
+published.
+
 ## License
 
 MIT

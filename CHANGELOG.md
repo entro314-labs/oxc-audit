@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.1.0] - 2026-08-11
+## [1.0.0] - 2026-08-11
 
 Initial release.
 
@@ -19,6 +19,10 @@ Initial release.
   a plugin carries Oxlint's base set along, because setting `plugins` overwrites it.
 - `oxc-audit` CLI with report-only default, `--write`, `--json`, `--dir`, `--config`,
   `--max-files`, and `--no-backup`.
+- The CLI decides it is the process entrypoint by real path, so `npx oxc-audit` and
+  `node_modules/.bin/oxc-audit` run the audit. Package managers install a bin as a symlink
+  and Node leaves `process.argv[1]` pointing at the link while resolving `import.meta.url`
+  to its target, so comparing the two raw paths would exit 0 having produced nothing.
 - Library API: `audit`, `detectStack`, `recommendForStack`, `mergeRecommendations`.
 - Atomic writes, automatic `.backup` of the previous config, `restoreConfigBackup()`, and
   a project-scoped lock with stale-lock reclamation.
