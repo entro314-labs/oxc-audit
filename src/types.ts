@@ -86,16 +86,19 @@ export interface StackSignal {
 
 export type StackSignalId =
   | 'typescript'
+  | 'tsconfig'
+  | 'tsgolint'
   | 'jsx'
   | 'react'
   | 'react-dom'
   | 'nextjs'
   | 'vue'
+  | 'svelte'
+  | 'astro'
   | 'vitest'
   | 'jest'
   | 'node'
   | 'jsdoc'
-  | 'promises'
   | 'esm'
   | 'monorepo'
 
@@ -113,8 +116,8 @@ export interface ProjectStack {
 
 /** A single recommended change to the Oxlint config, with its justification. */
 export interface Recommendation {
-  kind: 'plugin' | 'category' | 'rule'
-  /** Plugin name, category name, or rule name. */
+  kind: 'plugin' | 'category' | 'rule' | 'option'
+  /** Plugin name, category name, rule name, or `options` key. */
   target: string
   /** Severity for category/rule recommendations. */
   severity?: OxlintSeverity
@@ -137,6 +140,12 @@ export interface AuditReport {
   /** Recommendations already satisfied by the existing config. */
   alreadySatisfied: Recommendation[]
   /**
+   * Capabilities the project could adopt but has not installed the tooling for. Reported
+   * rather than configured, because writing config for a missing engine would produce a
+   * config the project cannot run.
+   */
+  prerequisites: Prerequisite[]
+  /**
    * Recommendations the existing config explicitly turns off. Treated as a deliberate
    * decision and never re-applied, but surfaced so the opt-out stays visible.
    */
@@ -148,6 +157,15 @@ export interface AuditReport {
     written: boolean
     changed: boolean
   }
+}
+
+export interface Prerequisite {
+  /** What becomes available once the prerequisite is met. */
+  capability: string
+  /** Why it is worth having. */
+  reason: string
+  /** The command that satisfies it. */
+  install: string
 }
 
 export interface AuditOptions {

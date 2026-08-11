@@ -12,7 +12,7 @@ import {
 import { validateOxlintConfig } from './oxlint-config-validator.js'
 import { acquireProjectLock, ProjectLockedError } from './project-lock.js'
 import { CollectingReporter } from './reporter.js'
-import { recommendForStack } from './rule-recommender.js'
+import { findPrerequisites, recommendForStack } from './rule-recommender.js'
 import { detectStack } from './stack-detector.js'
 import type { AuditOptions, AuditReport, ProjectStack, Reporter } from './types.js'
 
@@ -137,6 +137,7 @@ async function runAudit(
     stack,
     recommendations: merge.applied,
     alreadySatisfied: merge.alreadySatisfied,
+    prerequisites: findPrerequisites(stack),
     explicitlyDisabled: merge.explicitlyDisabled,
     config: {
       path: configPath,
@@ -191,6 +192,7 @@ function buildErrorReport(
     },
     recommendations: [],
     alreadySatisfied: [],
+    prerequisites: [],
     explicitlyDisabled: [],
     config: { path: configPath, existed: false, written: false, changed: false },
   }
@@ -199,8 +201,10 @@ function buildErrorReport(
 export { mergeRecommendations, OXLINT_DEFAULT_PLUGINS } from './config-merger.js'
 export { detectStack, hasSignal } from './stack-detector.js'
 export {
+  findPrerequisites,
   getRecommendablePlugins,
   getRecommendableRuleNames,
+  getTypeAwareRuleNames,
   recommendForStack,
 } from './rule-recommender.js'
 export { CollectingReporter, DefaultReporter } from './reporter.js'
