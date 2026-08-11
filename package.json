@@ -1,6 +1,6 @@
 {
   "name": "oxc-audit",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Deterministically audit a project's stack and recommend the Oxlint rules it is missing",
   "keywords": [
     "audit",
@@ -41,11 +41,12 @@
     "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:run",
     "build": "tsdown",
     "dev": "tsdown --watch",
-    "prepublishOnly": "pnpm check && pnpm build"
+    "prepublishOnly": "pnpm check && pnpm build",
+    "release": "bash scripts/release.sh"
   },
   "dependencies": {
     "commander": "15.0.0",
-    "jsonc-parser": "next",
+    "jsonc-parser": "4.0.0-next.2",
     "picocolors": "^1.1.1",
     "zod": "^4.4.3"
   },
@@ -63,7 +64,7 @@
   },
   "engines": {
     "node": ">=24.19.0",
-    "pnpm": ">=11.20.0"
+    "pnpm": ">=11.21.0"
   },
-  "packageManager": "pnpm@11.20.0"
+  "packageManager": "pnpm@11.21.0"
 }

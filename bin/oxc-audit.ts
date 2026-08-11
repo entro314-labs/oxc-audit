@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { realpath } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -300,8 +301,38 @@ export function createTerminationHandler(
   }
 }
 
+/**
+ * Whether this module is the process entrypoint rather than an import.
+ *
+ * Package managers install bins as symlinks (`node_modules/.bin/oxc-audit` ->
+ * `../oxc-audit/dist/bin/oxc-audit.mjs`). Node resolves symlinks when it builds
+ * `import.meta.url` but leaves `process.argv[1]` pointing at the link, so comparing the
+ * two raw paths only ever matches when the file is run by its real path. Invoked through
+ * the link — which is every `npx oxc-audit` and every `node_modules/.bin` call — the
+ * comparison fails and the CLI exits silently having parsed nothing. Both sides are
+ * resolved to their real paths before comparing.
+ */
+export async function isProcessEntrypoint(
+  invokedPath: string | undefined,
+  moduleUrl: string,
+): Promise<boolean> {
+  if (!invokedPath) {
+    return false
+  }
+
+  const modulePath = fileURLToPath(moduleUrl)
+
+  try {
+    return (await realpath(invokedPath)) === (await realpath(modulePath))
+  } catch {
+    // argv[1] can name something that is not on disk (an eval'd or piped entry). It is
+    // then not this module, but compare the raw paths rather than assume either way.
+    return invokedPath === modulePath
+  }
+}
+
 // Only self-execute as a binary; importing the module for tests must not run the CLI.
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+if (await isProcessEntrypoint(process.argv[1], import.meta.url)) {
   const controller = new AbortController()
   process.once('SIGINT', createTerminationHandler('SIGINT', controller, process.stderr))
   process.once('SIGTERM', createTerminationHandler('SIGTERM', controller, process.stderr))
