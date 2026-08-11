@@ -21,7 +21,7 @@ import type {
   Reporter,
   WorkspaceAuditReport,
 } from './types.js'
-import { findWorkspacePackages } from './workspace.js'
+import { discoverWorkspace } from './workspace.js'
 
 export async function audit(
   options: AuditOptions = {},
@@ -172,13 +172,24 @@ export async function auditWorkspace(
 ): Promise<WorkspaceAuditReport> {
   const projectDir = resolve(options.projectDir ?? process.cwd())
   const root = await audit(options, reporter)
-  const discovered = await findWorkspacePackages(projectDir, { maxDepth: options.maxDepth })
+  const discovery = await discoverWorkspace(projectDir, { maxDepth: options.maxDepth })
+  const discovered = discovery.packages
 
   reporter.info(
     discovered.length > 0
       ? `Found ${discovered.length} package(s) beneath ${projectDir}`
       : `No packages found beneath ${projectDir}`,
   )
+
+  // Skipping is correct, but never silent: an exclusion the user forgot about would
+  // otherwise look identical to a package the tool failed to find.
+  if (discovery.excluded.length > 0) {
+    reporter.info(
+      `Skipped ${discovery.excluded.length} package(s) excluded by ${discovery.declaredIn}: ${discovery.excluded
+        .map((entry) => entry.relativeDir)
+        .join(', ')}`,
+    )
+  }
 
   const packages: WorkspaceAuditReport['packages'] = []
 
@@ -262,5 +273,6 @@ export {
   recommendForStack,
 } from './rule-recommender.js'
 export { CollectingReporter, DefaultReporter } from './reporter.js'
-export { findWorkspacePackages } from './workspace.js'
+export { discoverWorkspace, findWorkspacePackages } from './workspace.js'
+export { matchesGlob, readWorkspaceDeclaration } from './workspace-globs.js'
 export * from './types.js'

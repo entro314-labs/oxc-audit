@@ -49,5 +49,10 @@ Initial release.
 - `--recurse` audits a workspace root and every package beneath it, each against its own
   nearest config. Packages are discovered by walking for `package.json`, which covers every
   workspace convention without parsing four different declaration formats.
-- `auditWorkspace()` and `findWorkspacePackages()` are exported for library use, and
-  `--max-depth` bounds the package search.
+- `auditWorkspace()`, `findWorkspacePackages()` and `discoverWorkspace()` are exported for
+  library use, and `--max-depth` bounds the package search.
+- Workspace declarations filter discovery, including negated globs. A package a repo
+  deliberately excludes (`'!apps/native'`) is never audited, and the skip is reported
+  rather than silent. `pnpm-workspace.yaml`, `package.json` workspaces (both array and
+  object forms), and `lerna.json` are read; with no declaration every package found on
+  disk is audited as before.
