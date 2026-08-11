@@ -159,6 +159,28 @@ const TARGETED_RULES: Array<{
     requires: ['jest'],
     reason: 'A committed `.only` silently stops the rest of the suite from running.',
   },
+  // Oxlint's `correctness` category already carries 33 of the 46 vue rules. These three
+  // are off by default and each names a concrete failure rather than a style preference;
+  // the remaining ten off-by-default vue rules are casing and declaration-style choices.
+  {
+    rule: 'vue/no-multiple-slot-args',
+    severity: 'error',
+    requires: ['vue'],
+    reason: 'A slot receives only its first argument; any others are silently discarded.',
+  },
+  {
+    rule: 'vue/require-typed-ref',
+    severity: 'warn',
+    requires: ['vue'],
+    reason:
+      'An untyped `ref()` infers `any`, so everything derived from it stops being typechecked. Only fires in `lang="ts"` blocks.',
+  },
+  {
+    rule: 'vue/require-prop-types',
+    severity: 'warn',
+    requires: ['vue'],
+    reason: 'A prop declared without a type gets no validation at all, in dev or production.',
+  },
 ]
 
 /**

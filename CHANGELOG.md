@@ -43,3 +43,11 @@ Initial release.
   the root manifest only.
 - Conformance fixtures exercising `.vue`, `.svelte`, and `.astro` against the real Oxlint
   binary, asserting the files are actually parsed rather than skipped.
+- Three hand-picked Vue rules that are off by default and name a concrete failure:
+  `no-multiple-slot-args`, `require-typed-ref`, and `require-prop-types`. Oxlint's
+  `correctness` category already covers 33 of the 46 Vue rules, so the rest are left alone.
+- `--recurse` audits a workspace root and every package beneath it, each against its own
+  nearest config. Packages are discovered by walking for `package.json`, which covers every
+  workspace convention without parsing four different declaration formats.
+- `auditWorkspace()` and `findWorkspacePackages()` are exported for library use, and
+  `--max-depth` bounds the package search.

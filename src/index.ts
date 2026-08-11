@@ -14,7 +14,14 @@ import { acquireProjectLock, ProjectLockedError } from './project-lock.js'
 import { CollectingReporter } from './reporter.js'
 import { findPrerequisites, recommendForStack } from './rule-recommender.js'
 import { detectStack } from './stack-detector.js'
-import type { AuditOptions, AuditReport, ProjectStack, Reporter } from './types.js'
+import type {
+  AuditOptions,
+  AuditReport,
+  ProjectStack,
+  Reporter,
+  WorkspaceAuditReport,
+} from './types.js'
+import { findWorkspacePackages } from './workspace.js'
 
 export async function audit(
   options: AuditOptions = {},
@@ -149,6 +156,53 @@ async function runAudit(
 }
 
 /**
+ * Audits a workspace root and every package beneath it.
+ *
+ * Dependency signals come from a single manifest, so auditing only the root of a
+ * workspace under-reports: the frameworks live in the leaf packages. This audits each
+ * package against its own nearest config, which is also how Oxlint resolves configs —
+ * a child config is used on its own rather than merged into the parent's.
+ *
+ * Packages are audited in sequence, not in parallel: each write takes a lock on its own
+ * directory, and serialising keeps the output readable and the failure mode obvious.
+ */
+export async function auditWorkspace(
+  options: AuditOptions = {},
+  reporter: Reporter = new CollectingReporter(),
+): Promise<WorkspaceAuditReport> {
+  const projectDir = resolve(options.projectDir ?? process.cwd())
+  const root = await audit(options, reporter)
+  const discovered = await findWorkspacePackages(projectDir, { maxDepth: options.maxDepth })
+
+  reporter.info(
+    discovered.length > 0
+      ? `Found ${discovered.length} package(s) beneath ${projectDir}`
+      : `No packages found beneath ${projectDir}`,
+  )
+
+  const packages: WorkspaceAuditReport['packages'] = []
+
+  for (const workspacePackage of discovered) {
+    options.signal?.throwIfAborted()
+
+    // Each package gets its own reporter so one package's warnings are not attributed
+    // to another in the combined output.
+    const packageReport = await audit(
+      { ...options, projectDir: workspacePackage.dir, configPath: undefined },
+      new CollectingReporter(),
+    )
+
+    packages.push({ relativeDir: workspacePackage.relativeDir, report: packageReport })
+  }
+
+  return {
+    success: root.success && packages.every(({ report }) => report.success),
+    root,
+    packages,
+  }
+}
+
+/**
  * Restores a config from its `.backup` sibling, for undoing an applied audit.
  */
 export async function restoreConfigBackup(
@@ -208,4 +262,5 @@ export {
   recommendForStack,
 } from './rule-recommender.js'
 export { CollectingReporter, DefaultReporter } from './reporter.js'
+export { findWorkspacePackages } from './workspace.js'
 export * from './types.js'

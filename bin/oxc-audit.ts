@@ -7,9 +7,14 @@ import pc from 'picocolors'
 import { z } from 'zod'
 
 import { findClosestPackageJson, readJsonFile } from '../src/fs-utils.js'
-import { audit } from '../src/index.js'
+import { audit, auditWorkspace } from '../src/index.js'
 import { DefaultReporter } from '../src/reporter.js'
-import type { AuditOptions, AuditReport, Recommendation } from '../src/types.js'
+import type {
+  AuditOptions,
+  AuditReport,
+  Recommendation,
+  WorkspaceAuditReport,
+} from '../src/types.js'
 
 interface Stream {
   write(chunk: string): boolean | undefined
@@ -27,6 +32,8 @@ interface ParsedCliOptions {
   write?: boolean
   backup?: boolean
   maxFiles?: number
+  maxDepth?: number
+  recurse?: boolean
   json?: boolean
   verbose?: boolean
 }
@@ -77,11 +84,24 @@ export async function runCli(
     write: options.write ?? false,
     noBackup: options.backup === false,
     maxFiles: options.maxFiles,
+    maxDepth: options.maxDepth,
     verbose: options.verbose ?? false,
     signal: runtimeOptions.signal,
   }
 
   try {
+    if (options.recurse) {
+      const workspace = await auditWorkspace(auditOptions, reporter)
+
+      if (options.json) {
+        stdout.write(`${JSON.stringify(workspace, null, 2)}\n`)
+      } else {
+        stdout.write(formatWorkspaceReport(workspace, options.write ?? false))
+      }
+
+      return workspace.success ? 0 : 1
+    }
+
     const report = await audit(auditOptions, reporter)
 
     if (options.json) {
@@ -131,6 +151,12 @@ function buildCommand(
     .option(
       '--max-files <count>',
       'Maximum source files to scan before truncating',
+      parsePositiveInteger,
+    )
+    .option('-r, --recurse', 'Also audit every package found beneath the directory')
+    .option(
+      '--max-depth <depth>',
+      'Directory depth to search for workspace packages',
       parsePositiveInteger,
     )
     .option('--json', 'Print the audit report as JSON to stdout')
@@ -204,6 +230,33 @@ function formatReport(report: AuditReport, write: boolean): string {
   )
 
   return lines.join('\n')
+}
+
+function formatWorkspaceReport(workspace: WorkspaceAuditReport, write: boolean): string {
+  const sections = [pc.bold(pc.underline('Workspace root')), formatReport(workspace.root, write)]
+
+  for (const { relativeDir, report } of workspace.packages) {
+    const counts = `${report.recommendations.length} to add, ${report.alreadySatisfied.length} satisfied`
+    sections.push(pc.bold(pc.underline(relativeDir)), pc.dim(`  ${counts}`), '')
+
+    // Only the actionable part is expanded per package; the full detail is in --json.
+    if (report.recommendations.length > 0) {
+      sections.push(...report.recommendations.map((entry) => `  ${formatTarget(entry)}`), '')
+    }
+
+    if (report.errors.length > 0 || report.blockers.length > 0) {
+      sections.push(
+        ...[...report.errors, ...report.blockers].map((message) => `  ${pc.red(message)}`),
+        '',
+      )
+    }
+  }
+
+  if (workspace.packages.length === 0) {
+    sections.push(pc.dim('No packages found beneath the root.'), '')
+  }
+
+  return sections.join('\n')
 }
 
 function formatRecommendation(recommendation: Recommendation): string {
