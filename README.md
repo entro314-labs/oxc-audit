@@ -63,17 +63,18 @@ Those invariants are asserted directly, over a matrix of existing configs, in
 | `typescript`          | `typescript` dependency, `tsconfig.json`, or `.ts`/`.tsx`/`.mts`/`.cts` files |
 | `jsx`                 | `.jsx` or `.tsx` files                                                        |
 | `react` / `react-dom` | the corresponding dependency                                                  |
-| `nextjs`              | `next` dependency or `next.config.*`                                          |
-| `vue`                 | `vue`/`nuxt` dependency, `vue.config.*`/`nuxt.config.*`, or `.vue` files      |
-| `svelte`              | `svelte` dependency, `svelte.config.*`, or `.svelte` files                    |
-| `astro`               | `astro` dependency, `astro.config.*`, or `.astro` files                       |
-| `vitest` / `jest`     | the dependency or its config file                                             |
-| `node`                | `@types/node`, `engines.node`, or a `bin` field                               |
-| `esm`                 | `"type": "module"`                                                            |
-| `monorepo`            | `workspaces`, `pnpm-workspace.yaml`, `lerna.json`, or `nx.json`               |
-| `tsconfig`            | `tsconfig.json` (tracked separately — type-aware linting needs a real one)    |
-| `tsgolint`            | `oxlint-tsgolint` dependency                                                  |
-| `jsdoc`               | `jsdoc` or `typedoc` dependency                                               |
+
+| `nextjs` | `next` dependency or `next.config.*` |
+| `vue` | `vue`/`nuxt` dependency, `vue.config.*`/`nuxt.config.*`, or `.vue` files |
+| `svelte` | `svelte` dependency, `svelte.config.*`, or `.svelte` files |
+| `astro` | `astro` dependency, `astro.config.*`, or `.astro` files |
+| `vitest` / `jest` | the dependency or its config file |
+| `node` | `@types/node`, `engines.node`, or a `bin` field |
+| `esm` | `"type": "module"` |
+| `monorepo` | `workspaces`, `pnpm-workspace.yaml`, `lerna.json`, or `nx.json` |
+| `tsconfig` | `tsconfig.json` (tracked separately — type-aware linting needs a real one) |
+| `tsgolint` | `oxlint-tsgolint` dependency |
+| `jsdoc` | `jsdoc` or `typedoc` dependency |
 
 Dependencies are read from `dependencies`, `devDependencies`, and `peerDependencies`, so a
 monorepo leaf package that inherits a framework is still detected.
@@ -82,9 +83,28 @@ Oxlint parses `.vue`, `.svelte`, and `.astro` and lints their script blocks with
 universal rules, but ships a dedicated plugin only for Vue. Svelte and Astro are still
 detected, and the missing plugin is reported rather than silently producing nothing.
 
-**Workspace roots.** Dependency signals come from one manifest. In a workspace root the
-frameworks live in the leaf packages, so a root-level audit under-reports — the tool says
-so and suggests running per package with `--dir`.
+## Workspaces
+
+Dependency signals come from one manifest, so auditing only a workspace root
+under-reports: the frameworks live in the leaf packages. `--recurse` audits the root and
+every package beneath it, each against its own nearest config — which is also how Oxlint
+resolves configs, since a child config is used on its own rather than merged into the
+parent's.
+
+```bash
+oxc-audit --recurse            # report on every package
+oxc-audit --recurse --write    # give each package its own config
+```
+
+Packages are found by walking for `package.json`, skipping `node_modules` and build
+output. That is deliberately convention-agnostic: `package.json` workspaces,
+`pnpm-workspace.yaml`, `lerna.json`, and `nx.json` each declare workspaces differently and
+one needs a YAML parser, whereas "a directory containing a package.json" is a fact on disk
+that holds for all of them. The trade-off is that a package outside the declared globs is
+still audited — which is useful anyway, since it is a real package with real source files.
+
+Without `--recurse`, a workspace root warns that it is under-reporting rather than passing
+silently.
 
 ## Type-aware rules
 
@@ -118,7 +138,9 @@ oxc-audit [options]
   -c, --config <path>    Path to the Oxlint config (default: .oxlintrc.json)
   -w, --write            Apply the recommendations. Without this the audit only reports.
       --no-backup        Skip writing a .backup copy before applying changes
+  -r, --recurse          Also audit every package found beneath the directory
       --max-files <n>    Maximum source files to scan before truncating
+      --max-depth <n>    Directory depth to search for workspace packages
       --json             Print the audit report as JSON to stdout
   -v, --verbose          Show detailed progress information
   -h, --help             Display help
@@ -163,6 +185,11 @@ Not a security scanner. Oxlint has no security plugin; the handful of security-r
 rules here (`no-eval`, `no-new-func`, `no-script-url`, `react/no-danger`,
 `react/jsx-no-target-blank`) catch specific well-understood mistakes. They are worth
 having, and they are not a substitute for a SAST tool or dependency auditing.
+
+Rule selection stays proportional to what a plugin already covers. Oxlint's `correctness`
+category alone carries 33 of the 46 Vue rules, so only three Vue rules are hand-picked —
+the ones that are off by default _and_ name a concrete failure. The other ten
+off-by-default Vue rules are casing and declaration-style choices, which are yours to make.
 
 It also does not enable `pedantic`, `style`, `restriction`, or `nursery` wholesale. Those
 are matters of taste or are unstable, and turning them on for someone is exactly the kind

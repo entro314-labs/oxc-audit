@@ -168,6 +168,15 @@ export interface Prerequisite {
   install: string
 }
 
+export interface WorkspaceAuditReport {
+  /** True when every audited package succeeded. */
+  success: boolean
+  /** The workspace root, audited in its own right. */
+  root: AuditReport
+  /** One report per package found beneath the root. */
+  packages: Array<{ relativeDir: string; report: AuditReport }>
+}
+
 export interface AuditOptions {
   /** Directory to audit. Defaults to the current working directory. */
   projectDir?: string
@@ -179,6 +188,8 @@ export interface AuditOptions {
   noBackup?: boolean
   /** Maximum source files to scan before truncating. */
   maxFiles?: number
+  /** Directory depth to search for workspace packages. */
+  maxDepth?: number
   verbose?: boolean
   signal?: AbortSignal
 }

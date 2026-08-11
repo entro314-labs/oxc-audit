@@ -301,3 +301,43 @@ describe('type-aware linting', () => {
     expect(report.explicitlyDisabled.map((entry) => entry.target)).toContain('typeAware')
   })
 })
+
+describe('Vue targeted rules', () => {
+  it('recommends the Vue rules that are off by default and Oxlint accepts them', async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({ name: 'app', dependencies: { vue: '^3.4.0' } }),
+      'src/App.vue':
+        '<script setup lang="ts">\nimport { ref } from "vue"\nconst thing = ref()\n</script>\n<template><div /></template>\n',
+    })
+
+    const report = await audit({ projectDir: dir, write: true })
+    const rules = report.recommendations
+      .filter((entry) => entry.kind === 'rule')
+      .map((entry) => entry.target)
+
+    expect(rules).toEqual(
+      expect.arrayContaining([
+        'vue/no-multiple-slot-args',
+        'vue/require-typed-ref',
+        'vue/require-prop-types',
+      ]),
+    )
+
+    const { stdout, stderr } = await run(['--config', '.oxlintrc.json', '.'], dir)
+    const output = `${stdout}${stderr}`
+
+    expect(output).not.toContain('Failed to parse')
+    // The untyped `ref()` must actually be flagged, proving the rule is live rather than
+    // merely present in the JSON.
+    expect(output).toContain('require-typed-ref')
+  })
+
+  it('does not recommend Vue rules for a project without Vue', async () => {
+    const dir = await setupProject(REACT_PROJECT)
+
+    const report = await audit({ projectDir: dir })
+    const rules = report.recommendations.map((entry) => entry.target)
+
+    expect(rules.filter((rule) => rule.startsWith('vue/'))).toEqual([])
+  })
+})
