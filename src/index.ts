@@ -19,6 +19,8 @@ import {
   OXLINT_CONFIG_NAMES,
 } from './oxlint-config-loader.js'
 import { validateOxlintConfig } from './oxlint-config-validator.js'
+import { updatePackageJson } from './package-updater.js'
+import { installBundledPlugins, VENDORED_PLUGIN_DIR } from './plugin-installer.js'
 import { acquireProjectLock, ProjectLockedError } from './project-lock.js'
 import { CollectingReporter } from './reporter.js'
 import { DEFAULT_REQUEST, findPrerequisites, recommendForStack } from './rule-recommender.js'
@@ -87,6 +89,12 @@ async function runAudit(
     forcedSignals: options.forcedSignals ?? DEFAULT_REQUEST.forcedSignals,
   }
 
+  // Copied before detection, so the `audit-plugins` signal is established in the same run
+  // rather than needing a second pass to notice what was just installed.
+  if (options.installPlugins && options.write) {
+    await installBundledPlugins(projectDir, reporter, { signal: options.signal })
+  }
+
   const detected = await detectStack(projectDir, reporter, { maxFiles: options.maxFiles })
   // Flags join the stack as evidence rather than short-circuiting it, so everything
   // downstream keeps working off one uniform notion of what the project contains.
@@ -119,6 +127,18 @@ async function runAudit(
   options.signal?.throwIfAborted()
 
   const merge = mergeRecommendations(loaded.config, recommendForStack(stack, request))
+
+  // Vendored plugin sources are tooling the project did not write. Linting them reports
+  // findings nobody asked for against code they do not maintain, so the directory this tool
+  // created is excluded from the config it writes.
+  if (isVendoredPluginDirPresent(stack)) {
+    const patterns = merge.config.ignorePatterns ?? []
+    const pattern = `${VENDORED_PLUGIN_DIR.replaceAll('\\', '/')}/**`
+
+    if (!patterns.includes(pattern)) {
+      merge.config.ignorePatterns = [...patterns, pattern]
+    }
+  }
 
   // Rewriting drops comments, which is a real loss the user did not ask for.
   if (options.write && containsComments(loaded.originalText)) {
@@ -161,9 +181,20 @@ async function runAudit(
     reporter.info('Configuration already satisfies every recommendation; nothing to write.')
   }
 
-  const format = options.format
-    ? await applyFormatterConfig(projectDir, stack, reporter, options, blocked)
-    : undefined
+  const format =
+    options.format !== false
+      ? await applyFormatterConfig(projectDir, stack, reporter, options, blocked)
+      : undefined
+
+  const packageUpdate = options.noScripts
+    ? undefined
+    : await updatePackageJson(projectDir, reporter, {
+        write: options.write === true && !blocked,
+        typeAware: merge.config.options?.typeAware === true,
+        format: options.format !== false,
+        jsPlugins: (merge.config.jsPlugins ?? []).length > 0,
+        signal: options.signal,
+      })
 
   return {
     success: reporter.getErrors().length === 0 && reporter.getBlockers().length === 0,
@@ -183,7 +214,16 @@ async function runAudit(
       changed: merge.changed,
     },
     format,
+    packageUpdate,
   }
+}
+
+/** True when the plugin sources were found as a copy in the tree rather than a dependency. */
+function isVendoredPluginDirPresent(stack: ProjectStack): boolean {
+  return stack.signals.some(
+    (signal) =>
+      signal.id === 'audit-plugins' && signal.evidence.some(({ kind }) => kind === 'config-file'),
+  )
 }
 
 /**

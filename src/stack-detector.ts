@@ -116,6 +116,9 @@ const DEPENDENCY_SIGNALS: Array<{ id: StackSignalId; packages: string[] }> = [
   // Supplies the js plugins. Without it a `jsPlugins` entry names a file that does not
   // exist and Oxlint refuses to start, so its presence gates those recommendations.
   { id: 'audit-plugins', packages: ['oxlint-plugin-audit'] },
+  // Every js plugin imports `@oxlint/plugins`. Without it Oxlint fails to load the plugin
+  // and refuses to start, so a `jsPlugins` entry is only safe once this is present.
+  { id: 'oxlint-plugins', packages: ['@oxlint/plugins'] },
 ]
 
 /** Extensions that establish a signal by their presence in the source tree. */

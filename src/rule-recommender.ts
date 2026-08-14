@@ -102,14 +102,22 @@ function meetsLevel(level: AuditLevel, minimum: AuditLevel): boolean {
  * Oxlint's categories, laid out as the level ladder.
  *
  * `correctness` and `suspicious` are Oxlint's own defaults and are stated explicitly so the
- * config never depends on an implicit default that could change upstream. Above them the
- * ladder reaches into categories most projects deliberately leave off, which is why they
- * need asking for: `pedantic` and `perf` are defensible team-wide, while `restriction` and
- * `style` are pure house taste and only appear at `paranoid`.
+ * config never depends on an implicit default that could change upstream. `pedantic` and
+ * `perf` are defensible team-wide decisions about how much checking to do, so they sit at
+ * `strict` where they have to be asked for.
  *
- * `nursery` is never enabled at any level. Its rules are explicitly unstable upstream, and
- * a config that changes meaning when Oxlint patches would break the determinism this tool
- * exists to provide.
+ * Three categories are never enabled at any level, no matter how high:
+ *
+ * - `style` and `restriction` are house taste, not defects. Measured against a codebase
+ *   that already passes its own lint, they produce roughly 1,200 and 400 findings — things
+ *   like `no-ternary`, `no-null` and `no-magic-numbers`. Turning them on wholesale is the
+ *   unasked-for churn this tool exists not to create; a project that wants them can name
+ *   them, and this tool will not overwrite that choice.
+ * - `nursery` is explicitly unstable upstream, so a config carrying it would change meaning
+ *   on an Oxlint patch and break determinism.
+ *
+ * `paranoid` therefore means depth of checking rather than breadth of opinion: it adds the
+ * type-aware rules that reject a lot of working code, not a category of style preferences.
  */
 const LEVEL_CATEGORIES: Array<{
   category: OxlintCategory
@@ -121,8 +129,6 @@ const LEVEL_CATEGORIES: Array<{
   { category: 'suspicious', severity: 'warn', level: 'recommended' },
   { category: 'pedantic', severity: 'warn', level: 'strict' },
   { category: 'perf', severity: 'warn', level: 'strict', domains: ['performance'] },
-  { category: 'restriction', severity: 'warn', level: 'paranoid' },
-  { category: 'style', severity: 'warn', level: 'paranoid' },
 ]
 
 /**
@@ -1113,7 +1119,10 @@ export function recommendForStack(
     }
   }
 
-  if (hasSignal(stack, 'audit-plugins')) {
+  // Both halves are required: the sources to point at, and the runtime they import. A
+  // `jsPlugins` entry without `@oxlint/plugins` installed makes Oxlint fail to start, which
+  // would leave the project worse off than having no custom rules at all.
+  if (hasSignal(stack, 'audit-plugins') && hasSignal(stack, 'oxlint-plugins')) {
     const base = auditPluginSpecifierBase(stack)
 
     for (const { plugin, requires, reason, rules, domains: pluginDomains } of AUDIT_PLUGINS) {
@@ -1173,7 +1182,7 @@ export function findPrerequisites(stack: ProjectStack): Prerequisite[] {
     })
   }
 
-  if (!hasSignal(stack, 'audit-plugins')) {
+  if (!hasSignal(stack, 'audit-plugins') || !hasSignal(stack, 'oxlint-plugins')) {
     const applicable = AUDIT_PLUGINS.filter(({ requires }) =>
       requires.some((signal) => hasSignal(stack, signal)),
     ).map(({ plugin }) => plugin)
@@ -1181,8 +1190,12 @@ export function findPrerequisites(stack: ProjectStack): Prerequisite[] {
     if (applicable.length > 0) {
       prerequisites.push({
         capability: `Stack-specific audit rules (${applicable.join(', ')})`,
-        reason: `This project's dependencies match ${applicable.length} of the audit plugins, which catch deprecated APIs and migration residue that still type-checks and still runs. They load through jsPlugins, so the package has to be present before the config can name them.`,
-        install: 'pnpm add -D oxlint-plugin-audit',
+        // Not an npm install: these plugins ship inside oxc-audit rather than as their own
+        // package, and are copied into the project because Oxlint loads js plugins by path.
+        reason: `This project's dependencies match ${applicable.length} of the audit plugins, which catch deprecated APIs and migration residue that still type-checks and still runs. They load through jsPlugins, so the sources have to be in the project before the config can name them.`,
+        install: hasSignal(stack, 'audit-plugins')
+          ? 'pnpm add -D @oxlint/plugins'
+          : 'oxc-audit --write --install-plugins',
       })
     }
   }

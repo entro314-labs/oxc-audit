@@ -12,7 +12,7 @@ starting point, or on one that already has a config to see what the stack has ou
 npx oxc-audit                      # report only
 npx oxc-audit --write              # apply the recommendations
 npx oxc-audit --strict --security  # ask for more
-npx oxc-audit --write --format     # configure the formatter too
+npx oxc-audit --write --install-plugins  # add the custom plugins too
 ```
 
 Four tools, one pass:
@@ -26,7 +26,28 @@ Four tools, one pass:
 
 Nothing is written for a tool that is not installed. Where a capability is wanted but its
 engine is missing, it is reported as a prerequisite rather than configured, because a config
-naming a missing engine is one Oxlint refuses to start on.
+naming a missing engine is one Oxlint refuses to start on. That covers `oxlint-tsgolint` for
+type-aware rules and `@oxlint/plugins` for the custom plugins — without the latter, Oxlint
+fails to load a `jsPlugins` entry and refuses to start at all.
+
+`--write` also adds `lint`, `lint:fix`, `format` and `format:check` scripts to `package.json`
+when they are absent, so there is something to run. An existing script of the same name is
+left alone. Dependencies are reported with the right command for the project's own package
+manager, never installed — the lockfile is the project's to change.
+
+## The custom plugins
+
+`oxlint-plugin-audit` is not on npm. It ships inside `oxc-audit` and is copied into the
+project, because Oxlint loads js plugins by path:
+
+```bash
+oxc-audit --write --install-plugins   # copies them to tools/oxlint/audit-plugins/
+pnpm add -D @oxlint/plugins           # the runtime every plugin imports
+```
+
+The copy is never overwritten once it exists: vendored sources are code the project now owns
+and may have edited. The directory is added to `ignorePatterns`, since linting tooling the
+project did not write reports findings against code it does not maintain.
 
 ## What it does
 
@@ -54,16 +75,25 @@ recommended without evidence in the project.
 How much to ask for. Each level is a strict superset of the one below, and they map onto
 Oxlint's own categories, so they mean here what they mean in a hand-written config.
 
-| Level                       | Categories                 | Type-aware rules                                        |
-| --------------------------- | -------------------------- | ------------------------------------------------------- |
-| `--basic`                   | `correctness`              | none - the config stays fast and quiet                  |
-| `--recommended` _(default)_ | `+ suspicious`             | the ~27 that find genuinely unsound code                |
-| `--strict`                  | `+ pedantic`, `+ perf`     | `+ ~27` that are right but reject a lot of working code |
-| `--paranoid`                | `+ restriction`, `+ style` | `+ 5` whole-codebase policies                           |
+| Level                       | Categories             | Type-aware rules                          | Findings on a clean codebase |
+| --------------------------- | ---------------------- | ----------------------------------------- | ---------------------------- |
+| `--basic`                   | `correctness`          | none                                      | 0                            |
+| `--recommended` _(default)_ | `+ suspicious`         | the ~27 that find unsound code            | ~38                          |
+| `--strict`                  | `+ pedantic`, `+ perf` | `+ ~27` that reject a lot of working code | ~341                         |
+| `--paranoid`                | same as strict         | `+ 5` whole-codebase policies             | ~350                         |
 
-`nursery` is never enabled at any level: its rules are explicitly unstable upstream, and a
-config that changes meaning when Oxlint patches would break the determinism this tool exists
-to provide.
+The last column was measured against this repository, which passes its own lint. `paranoid`
+means depth of checking rather than breadth of opinion, which is why it adds no categories
+over `strict`.
+
+Three categories are never enabled, at any level:
+
+- **`style` and `restriction` are taste, not defects.** On the same codebase they report
+  roughly 1,200 and 400 findings - `no-ternary`, `no-null`, `no-magic-numbers` and the like.
+  Turning them on wholesale is the unasked-for churn this tool exists not to create. A
+  project that wants them can set them itself, and nothing here will overwrite that.
+- **`nursery` is unstable upstream**, so a config carrying it would change meaning on an
+  Oxlint patch and break determinism.
 
 `--dom` is the maximal switch - `--paranoid` with every domain turned on at once. It changes
 nothing about evidence: a rule with no signal behind it is still never recommended.
@@ -97,8 +127,9 @@ Stack
 
 ## The formatter
 
-`--format` writes `.oxfmtrc.jsonc` beside the linter config, under the same additive rule: a
-key already present is a decision and is never overwritten, so a second run is a no-op.
+A formatter config is part of the toolchain, so `.oxfmtrc.jsonc` is written beside the linter
+config by default; `--no-format` skips it. Both follow the same additive rule: a key already
+present is a decision and is never overwritten, so a second run is a no-op.
 
 An existing Prettier or Biome config wins over every default - the codebase is already
 formatted that way, and imposing different settings would rewrite every file on the first
