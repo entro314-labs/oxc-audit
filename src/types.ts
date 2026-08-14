@@ -328,8 +328,6 @@ export interface AuditOptions {
   forcedSignals?: StackSignalId[]
   /** Also write a formatter config beside the linter config. Defaults to true. */
   format?: boolean
-  /** Copy the bundled Oxlint plugins into the project. */
-  installPlugins?: boolean
   /** Skip adding lint and format scripts to package.json. */
   noScripts?: boolean
   verbose?: boolean

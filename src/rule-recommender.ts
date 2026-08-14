@@ -1190,12 +1190,15 @@ export function findPrerequisites(stack: ProjectStack): Prerequisite[] {
     if (applicable.length > 0) {
       prerequisites.push({
         capability: `Stack-specific audit rules (${applicable.join(', ')})`,
-        // Not an npm install: these plugins ship inside oxc-audit rather than as their own
-        // package, and are copied into the project because Oxlint loads js plugins by path.
-        reason: `This project's dependencies match ${applicable.length} of the audit plugins, which catch deprecated APIs and migration residue that still type-checks and still runs. They load through jsPlugins, so the sources have to be in the project before the config can name them.`,
+        // `oxlint-plugin-audit` is not published yet. Saying so is the only honest thing to
+        // report: the previous advice named an npm package that 404s, and copying the
+        // sources into the project puts foreign TypeScript into its compilation, where a
+        // default tsconfig picks it up and a `.ts` import extension it cannot resolve
+        // breaks the project's own typecheck.
+        reason: `This project's dependencies match ${applicable.length} of the audit plugins, which catch deprecated APIs and migration residue that still type-checks and still runs. They are not published yet, so there is nothing to install; the rules are unavailable until there is.`,
         install: hasSignal(stack, 'audit-plugins')
           ? 'pnpm add -D @oxlint/plugins'
-          : 'oxc-audit --write --install-plugins',
+          : '(not published yet - nothing to install)',
       })
     }
   }
