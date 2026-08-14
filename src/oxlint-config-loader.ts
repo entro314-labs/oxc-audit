@@ -7,8 +7,36 @@ import type { ParseError as JsoncParseError } from 'jsonc-parser'
 import { pathExists } from './fs-utils.js'
 import type { OxlintConfig } from './types.js'
 
-/** Config file names Oxlint looks for, most conventional first. */
+/** JSON config file names Oxlint looks for, most conventional first. */
 export const OXLINT_CONFIG_NAMES = ['.oxlintrc.json', '.oxlintrc.jsonc', 'oxlintrc.json']
+
+/**
+ * Module config file names Oxlint also discovers.
+ *
+ * These matter even though this tool cannot write them: Oxlint refuses to start when a
+ * directory holds both a module config and an `.oxlintrc.json` — "Only one of
+ * `.oxlintrc.json` and `oxlint.config.ts` is allowed per directory" — so creating the JSON
+ * file beside one would take the project's linting from working to not running at all.
+ */
+export const OXLINT_MODULE_CONFIG_NAMES = [
+  'oxlint.config.ts',
+  'oxlint.config.mts',
+  'oxlint.config.js',
+  'oxlint.config.mjs',
+]
+
+/** The module config in this directory, if one exists. */
+export async function findOxlintModuleConfig(projectDir: string): Promise<string | undefined> {
+  for (const name of OXLINT_MODULE_CONFIG_NAMES) {
+    const candidate = resolve(projectDir, name)
+
+    if (await pathExists(candidate)) {
+      return candidate
+    }
+  }
+
+  return undefined
+}
 
 export interface LoadedOxlintConfig {
   path: string

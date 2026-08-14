@@ -428,3 +428,33 @@ describe('the formatter config', () => {
     expect(report.format).toBeUndefined()
   })
 })
+
+/**
+ * Oxlint allows one config per directory and refuses to start when it finds two:
+ * "Only one of `.oxlintrc.json` and `oxlint.config.ts` is allowed per directory."
+ * Writing the JSON file beside a module config would take a project from linting to not
+ * running at all, so it is blocked rather than written.
+ */
+describe('projects configured with a module config', () => {
+  it('refuses to write a competing .oxlintrc.json', async () => {
+    const dir = await setupProject({
+      ...REACT_PROJECT,
+      'oxlint.config.ts': 'export default { rules: { "no-console": "error" } }\n',
+    })
+    const report = await audit({ projectDir: dir, write: true })
+
+    expect(report.blockers.join('\n')).toMatch(/oxlint\.config\.ts/u)
+    expect(report.config.written).toBe(false)
+    await expect(readFile(join(dir, '.oxlintrc.json'), 'utf-8')).rejects.toThrow()
+  })
+
+  it('still reports what it would recommend', async () => {
+    const dir = await setupProject({
+      ...REACT_PROJECT,
+      'oxlint.config.ts': 'export default {}\n',
+    })
+    const report = await audit({ projectDir: dir, write: true })
+
+    expect(report.recommendations.length).toBeGreaterThan(0)
+  })
+})

@@ -15,6 +15,7 @@ import { copyFileIfExists, pathExists, writeTextFileAtomically } from './fs-util
 import {
   containsComments,
   findOxlintConfig,
+  findOxlintModuleConfig,
   loadOxlintConfig,
   OXLINT_CONFIG_NAMES,
 } from './oxlint-config-loader.js'
@@ -120,6 +121,16 @@ async function runAudit(
   options.signal?.throwIfAborted()
 
   const merge = mergeRecommendations(loaded.config, recommendForStack(stack, request))
+
+  // Oxlint refuses to start when a directory holds both a module config and an
+  // `.oxlintrc.json`, so writing one beside `oxlint.config.ts` would break linting outright.
+  const moduleConfigPath = await findOxlintModuleConfig(projectDir)
+
+  if (options.write && moduleConfigPath !== undefined && !loaded.existed) {
+    reporter.blocker(
+      `${moduleConfigPath} already configures Oxlint, and Oxlint allows only one config per directory. Writing ${configPath} would stop it running entirely. Apply these recommendations to ${moduleConfigPath} by hand.`,
+    )
+  }
 
   // Rewriting drops comments, which is a real loss the user did not ask for.
   if (options.write && containsComments(loaded.originalText)) {

@@ -35,6 +35,8 @@ const TurboConfigSchema = z
 
 const TsconfigSchema = z
   .object({
+    include: z.array(z.string()).optional(),
+    files: z.array(z.string()).optional(),
     compilerOptions: z
       .object({
         baseUrl: z.string().optional(),
@@ -294,6 +296,23 @@ function auditTsconfig(
   hasNextjs: boolean,
 ): ConfigFinding[] {
   const findings: ConfigFinding[] = []
+
+  // A tsconfig with neither `include` nor `files` compiles every TypeScript file under the
+  // project root. Oxlint's own type-aware guidance names an oversized root tsconfig as the
+  // usual cause of slow, memory-hungry runs, and the same program is what `tsc` loads, so
+  // an unscoped config is felt twice over.
+  if (config.include === undefined && config.files === undefined) {
+    findings.push(
+      finding(
+        'info',
+        TSCONFIG,
+        'include',
+        'Compilation scope not stated',
+        'With neither `include` nor `files`, TypeScript compiles every file under the project root — build output and vendored tooling included. Type-aware linting loads the same program, and Oxlint documents an oversized root tsconfig as the usual cause of slow, memory-hungry runs. Name the source directories explicitly.',
+      ),
+    )
+  }
+
   const options = config.compilerOptions
   if (options === undefined) return findings
 

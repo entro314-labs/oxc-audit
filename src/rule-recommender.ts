@@ -101,10 +101,10 @@ function meetsLevel(level: AuditLevel, minimum: AuditLevel): boolean {
 /**
  * Oxlint's categories, laid out as the level ladder.
  *
- * `correctness` and `suspicious` are Oxlint's own defaults and are stated explicitly so the
- * config never depends on an implicit default that could change upstream. `pedantic` and
- * `perf` are defensible team-wide decisions about how much checking to do, so they sit at
- * `strict` where they have to be asked for.
+ * Oxlint enables `correctness` alone by default. `basic` states that explicitly so the config
+ * never depends on an implicit default that could change upstream, and every level above it
+ * is an addition the user asked for: `suspicious` at `recommended`, then `pedantic` and
+ * `perf` at `strict`, which are defensible team-wide decisions about how much to check.
  *
  * Three categories are never enabled at any level, no matter how high:
  *
@@ -1065,8 +1065,8 @@ export function recommendForStack(
       target: entry.category,
       severity: entry.severity,
       reason: meetsLevel(level, entry.level)
-        ? entry.level === 'basic' || entry.level === 'recommended'
-          ? `Stated explicitly so the config does not depend on Oxlint's default for ${entry.category}.`
+        ? entry.level === 'basic'
+          ? `Oxlint's only default category, stated explicitly so the config does not depend on that default.`
           : `The ${level} level reaches Oxlint's ${entry.category} category.`
         : `The ${askedByDomain ?? ''} rule set covers Oxlint's ${entry.category} category.`,
       triggeredBy: [],

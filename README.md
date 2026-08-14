@@ -38,7 +38,12 @@ manager, never installed — the lockfile is the project's to change.
 ## The custom plugins
 
 `oxlint-plugin-audit` lives in [plugins/](plugins/) in this repository and is **not published
-yet**, so the audit reports the plugins its rules would apply to and stops there.
+yet**, so the audit reports the plugins its rules would apply to and stops there. Oxlint's own
+docs describe two ways to load a js plugin — an npm specifier or a local path — and publishing
+is the one that does not put foreign source in your tree.
+
+Worth knowing before you rely on them: Oxlint states that **js plugins are in alpha and not
+subject to semver**, so the plugin API can change between minor releases.
 
 It is deliberately not copied into your project. Oxlint loads js plugins by filesystem path,
 which makes vendoring the sources tempting, but a `tsconfig.json` with no `include` compiles
@@ -155,12 +160,12 @@ Configuration findings (not applied)
       the July 2026 monthly set, CVE-2026-64641..64649. Raise the range.
 ```
 
-| File                  | Checked for                                                                                                         |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `turbo.json`          | The Turborepo 1.x `pipeline` key; build tasks with no `outputs`; `cache: false`                                     |
-| `pnpm-workspace.yaml` | Settings consolidated into `allowBuilds` in pnpm 11; `auditConfig.ignoreCves`; protective defaults turned off       |
-| `package.json`        | Dependencies below a published security floor; `engines.node` below what a dependency requires                      |
-| `tsconfig.json`       | `baseUrl` and `moduleResolution: "node"` under Next.js 16.3, which stopped suppressing their warnings; `strict` off |
+| File                  | Checked for                                                                                                                                                                                              |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `turbo.json`          | The Turborepo 1.x `pipeline` key; build tasks with no `outputs`; `cache: false`                                                                                                                          |
+| `pnpm-workspace.yaml` | Settings consolidated into `allowBuilds` in pnpm 11; `auditConfig.ignoreCves`; protective defaults turned off                                                                                            |
+| `package.json`        | Dependencies below a published security floor; `engines.node` below what a dependency requires                                                                                                           |
+| `tsconfig.json`       | `baseUrl` and `moduleResolution: "node"` under Next.js 16.3, which stopped suppressing their warnings; `strict` off; no `include`/`files`, which Oxlint names as the usual cause of slow type-aware runs |
 
 **These are never applied.** They sit outside the configs this tool writes, and their
 fixes are codemods and version bumps rather than key edits. A version range the checker
