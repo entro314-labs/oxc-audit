@@ -4,7 +4,8 @@
   "ignorePatterns": [
     // Deliberately broken code, kept so the plugin package can prove its rules still fire.
     "plugins/fixtures",
-    // Generated copies of plugins/src; `pnpm --filter ... check:skill-assets` keeps them in sync.
+    // Generated copies of plugins/src. Linting them reports every finding twice, and
+    // `pnpm --filter oxlint-plugin-audit check:skill-assets` is what keeps them in sync.
     "plugins/skills/*/assets"
   ],
 

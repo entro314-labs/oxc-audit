@@ -165,8 +165,10 @@ export type StackSignalId =
   | 'stripe'
   | 'supabase'
   | 'vite'
-  /** The audit plugin package itself, as a dependency or a copy under `tools/`. */
+  /** The audit plugin sources, as a dependency or a copy under `tools/`. */
   | 'audit-plugins'
+  /** `@oxlint/plugins`, the runtime every js plugin imports. Without it none of them load. */
+  | 'oxlint-plugins'
 
 export interface ProjectStack {
   projectDir: string
@@ -255,8 +257,22 @@ export interface AuditReport {
     written: boolean
     changed: boolean
   }
-  /** The formatter half of the run. Absent unless `--format` asked for it. */
+  /** The formatter half of the run. Absent when `--no-format` turned it off. */
   format?: FormatConfigReport
+  /** Scripts added and dependencies still missing. Absent when there is no manifest. */
+  packageUpdate?: PackageUpdate
+}
+
+/** Scripts and dependencies the project needs to run what was configured. */
+export interface PackageUpdate {
+  path: string
+  /** Script names added by this run. An existing script of the same name is left alone. */
+  scriptsAdded: string[]
+  written: boolean
+  /** Tools the config needs that the manifest does not declare. Reported, never installed. */
+  missingDependencies: string[]
+  /** The install command for the project's own package manager. */
+  installCommand: string | undefined
 }
 
 /** What happened to the formatter config, when `--format` asked for one. */
@@ -310,8 +326,12 @@ export interface AuditOptions {
   maximal?: boolean
   /** Signals to assert regardless of what the project declares. */
   forcedSignals?: StackSignalId[]
-  /** Also write a formatter config beside the linter config. */
+  /** Also write a formatter config beside the linter config. Defaults to true. */
   format?: boolean
+  /** Copy the bundled Oxlint plugins into the project. */
+  installPlugins?: boolean
+  /** Skip adding lint and format scripts to package.json. */
+  noScripts?: boolean
   verbose?: boolean
   signal?: AbortSignal
 }

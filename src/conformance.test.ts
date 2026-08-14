@@ -414,9 +414,16 @@ describe('the formatter config', () => {
     expect(written.printWidth).toBe(100)
   })
 
-  it('writes nothing when --format was not asked for', async () => {
+  it('writes a formatter config by default, since it is part of the toolchain', async () => {
     const dir = await setupProject(REACT_PROJECT)
     const report = await audit({ projectDir: dir, write: true })
+
+    expect(report.format?.written).toBe(true)
+  })
+
+  it('writes nothing when --no-format turned it off', async () => {
+    const dir = await setupProject(REACT_PROJECT)
+    const report = await audit({ projectDir: dir, format: false, write: true })
 
     expect(report.format).toBeUndefined()
   })

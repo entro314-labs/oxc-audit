@@ -106,7 +106,9 @@ export async function runCli(
     noBackup: options.backup === false,
     maxFiles: options.maxFiles,
     maxDepth: options.maxDepth,
-    format: options.format === true,
+    format: options.format !== false,
+    installPlugins: options.installPlugins === true,
+    noScripts: options.scripts === false,
     verbose: options.verbose ?? false,
     signal: runtimeOptions.signal,
   }
@@ -181,7 +183,12 @@ function buildCommand(
       'Directory depth to search for workspace packages',
       parsePositiveInteger,
     )
-    .option('--format', 'Also write an oxfmt formatter config beside the linter config')
+    .option('--no-format', 'Skip the oxfmt formatter config; write only the linter config')
+    .option(
+      '--install-plugins',
+      'Copy the bundled Oxlint plugins into tools/oxlint/audit-plugins (needs --write)',
+    )
+    .option('--no-scripts', 'Skip adding lint and format scripts to package.json')
     .option('--json', 'Print the audit report as JSON to stdout')
     .option('-v, --verbose', 'Show detailed progress information')
 
@@ -348,6 +355,28 @@ function formatReport(report: AuditReport, write: boolean): string {
       lines.push(`      ${pc.dim(`Settings carried across from the ${carriedFrom} config.`)}`)
     }
     lines.push('')
+  }
+
+  if (report.packageUpdate) {
+    const { path, scriptsAdded, written, missingDependencies, installCommand } =
+      report.packageUpdate
+
+    if (scriptsAdded.length > 0 || missingDependencies.length > 0) {
+      lines.push(pc.bold(written ? 'Scripts added' : 'Scripts'))
+
+      if (scriptsAdded.length > 0) {
+        lines.push(`  ${pc.cyan(path)} - ${scriptsAdded.join(', ')}`)
+      }
+
+      if (installCommand) {
+        lines.push(
+          `  ${pc.dim(`Not installed yet: ${missingDependencies.join(', ')}`)}`,
+          `      ${installCommand}`,
+        )
+      }
+
+      lines.push('')
+    }
   }
 
   if (report.prerequisites.length > 0) {

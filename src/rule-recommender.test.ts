@@ -33,29 +33,43 @@ describe('audit plugin recommendations', () => {
   })
 
   it('recommends only the plugins the detected stack justifies', () => {
-    const targets = jsPluginTargets(stackOf(['audit-plugins', 'typescript', 'zod']))
+    const targets = jsPluginTargets(
+      stackOf(['audit-plugins', 'oxlint-plugins', 'typescript', 'zod']),
+    )
 
     // `web-security` is stack-agnostic, so any source at all justifies it.
     expect(targets).toEqual(['data-layer', 'web-security', 'slop-stop'])
   })
 
   it('recommends the stack-agnostic security plugin from a source signal alone', () => {
-    expect(jsPluginTargets(stackOf(['audit-plugins', 'esm']))).toEqual(['web-security'])
+    expect(jsPluginTargets(stackOf(['audit-plugins', 'oxlint-plugins', 'esm']))).toEqual([
+      'web-security',
+    ])
   })
 
   it('recommends the Supabase plugin only when Supabase is present', () => {
-    expect(jsPluginTargets(stackOf(['audit-plugins', 'supabase']))).toEqual(['supabase'])
-    expect(jsPluginTargets(stackOf(['audit-plugins', 'drizzle']))).not.toContain('supabase')
+    expect(jsPluginTargets(stackOf(['audit-plugins', 'oxlint-plugins', 'supabase']))).toEqual([
+      'supabase',
+    ])
+    expect(jsPluginTargets(stackOf(['audit-plugins', 'oxlint-plugins', 'drizzle']))).not.toContain(
+      'supabase',
+    )
   })
 
   it('recommends a plugin for any one of the stacks it covers', () => {
-    expect(jsPluginTargets(stackOf(['audit-plugins', 'drizzle']))).toEqual(['data-layer'])
-    expect(jsPluginTargets(stackOf(['audit-plugins', 'stripe']))).toEqual(['ai-integrations'])
-    expect(jsPluginTargets(stackOf(['audit-plugins', 'vite']))).toEqual(['ts-tooling'])
+    expect(jsPluginTargets(stackOf(['audit-plugins', 'oxlint-plugins', 'drizzle']))).toEqual([
+      'data-layer',
+    ])
+    expect(jsPluginTargets(stackOf(['audit-plugins', 'oxlint-plugins', 'stripe']))).toEqual([
+      'ai-integrations',
+    ])
+    expect(jsPluginTargets(stackOf(['audit-plugins', 'oxlint-plugins', 'vite']))).toEqual([
+      'ts-tooling',
+    ])
   })
 
   it('carries each plugin its rules, scoped to that plugin', () => {
-    const rules = recommendForStack(stackOf(['audit-plugins', 'vite']))
+    const rules = recommendForStack(stackOf(['audit-plugins', 'oxlint-plugins', 'vite']))
       .filter(({ kind, target }) => kind === 'rule' && target.includes('/'))
       .map(({ target }) => target)
       .filter((target) => target.startsWith('ts-tooling/'))
@@ -67,15 +81,15 @@ describe('audit plugin recommendations', () => {
   })
 
   it('never recommends the rule that fires on every pre-existing assertion', () => {
-    const targets = recommendForStack(stackOf(['audit-plugins', 'typescript'])).map(
-      ({ target }) => target,
-    )
+    const targets = recommendForStack(
+      stackOf(['audit-plugins', 'oxlint-plugins', 'typescript']),
+    ).map(({ target }) => target)
 
     expect(targets).not.toContain('slop-stop/require-safety-comment-for-type-assertion')
   })
 
   it('points at node_modules when the package is a dependency', () => {
-    const entry = recommendForStack(stackOf(['audit-plugins', 'zod'])).find(
+    const entry = recommendForStack(stackOf(['audit-plugins', 'oxlint-plugins', 'zod'])).find(
       ({ kind }) => kind === 'js-plugin',
     )
 
@@ -83,15 +97,15 @@ describe('audit plugin recommendations', () => {
   })
 
   it('points at the vendored copy when the plugins were copied into the tree', () => {
-    const entry = recommendForStack(stackOf([['audit-plugins', 'config-file'], 'zod'])).find(
-      ({ kind }) => kind === 'js-plugin',
-    )
+    const entry = recommendForStack(
+      stackOf([['audit-plugins', 'config-file'], 'oxlint-plugins', 'zod']),
+    ).find(({ kind }) => kind === 'js-plugin')
 
     expect(entry?.specifier).toBe('./tools/oxlint/audit-plugins/data-layer/index.ts')
   })
 
   it('is a pure function of the stack', () => {
-    const stack = stackOf(['audit-plugins', 'typescript', 'zod', 'nextjs'])
+    const stack = stackOf(['audit-plugins', 'oxlint-plugins', 'typescript', 'zod', 'nextjs'])
 
     expect(recommendForStack(stack)).toEqual(recommendForStack(stack))
   })
@@ -111,12 +125,16 @@ describe('built-in rules accompany the custom plugins', () => {
 
   for (const { signals, jsPlugin, builtins } of pairs) {
     it(`enables ${builtins.join(' and ')} alongside ${jsPlugin}`, () => {
-      const recommendations = recommendForStack(stackOf(['audit-plugins', ...signals]))
+      const recommendations = recommendForStack(
+        stackOf(['audit-plugins', 'oxlint-plugins', ...signals]),
+      )
       const enabled = recommendations
         .filter(({ kind }) => kind === 'plugin')
         .map(({ target }) => target)
 
-      expect(jsPluginTargets(stackOf(['audit-plugins', ...signals]))).toContain(jsPlugin)
+      expect(jsPluginTargets(stackOf(['audit-plugins', 'oxlint-plugins', ...signals]))).toContain(
+        jsPlugin,
+      )
       for (const builtin of builtins) {
         expect(enabled).toContain(builtin)
       }
@@ -172,7 +190,16 @@ describe('audit plugin prerequisites', () => {
 
     expect(prerequisite?.capability).toContain('data-layer')
     expect(prerequisite?.capability).toContain('ai-integrations')
-    expect(prerequisite?.install).toBe('pnpm add -D oxlint-plugin-audit')
+    expect(prerequisite?.install).toBe('oxc-audit --write --install-plugins')
+  })
+
+  it('asks for the runtime, not the sources, once the sources are already vendored', () => {
+    const prerequisite = findPrerequisites(stackOf([['audit-plugins', 'config-file'], 'zod'])).find(
+      ({ capability }) => capability.startsWith('Stack-specific audit rules'),
+    )
+
+    // The plugins are there but nothing can load them without `@oxlint/plugins`.
+    expect(prerequisite?.install).toBe('pnpm add -D @oxlint/plugins')
   })
 
   it('stays quiet when no covered stack is present', () => {
@@ -182,7 +209,7 @@ describe('audit plugin prerequisites', () => {
   })
 
   it('stops asking once the package is installed', () => {
-    const capabilities = findPrerequisites(stackOf(['audit-plugins', 'zod'])).map(
+    const capabilities = findPrerequisites(stackOf(['audit-plugins', 'oxlint-plugins', 'zod'])).map(
       ({ capability }) => capability,
     )
 
@@ -235,11 +262,14 @@ describe('the level ladder', () => {
     expect(categoriesAt('basic')).toEqual(['correctness'])
     expect(categoriesAt('recommended')).toEqual(['correctness', 'suspicious'])
     expect(categoriesAt('strict')).toEqual(['correctness', 'suspicious', 'pedantic', 'perf'])
-    expect(categoriesAt('paranoid')).toContain('restriction')
+    expect(categoriesAt('paranoid')).toEqual(categoriesAt('strict'))
   })
 
-  it('never enables the nursery category, whose rules are unstable upstream', () => {
-    expect(targetsAt({ level: 'paranoid' })).not.toContain('nursery')
+  // Measured against a codebase that passes its own lint, `style` alone reports ~1,200
+  // findings and `restriction` ~400 - all of it taste. Enabling either wholesale is the
+  // unasked-for churn this tool exists not to create.
+  it.each(['nursery', 'style', 'restriction'])('never enables the %s category', (category) => {
+    expect(targetsAt({ level: 'paranoid', maximal: true })).not.toContain(category)
   })
 
   it('carries no type-aware rules at basic, and does not ask for the engine option', () => {
@@ -281,7 +311,7 @@ describe('domain sets', () => {
   })
 
   it('pulls in a js plugin the level would not have reached', () => {
-    const stack = stackOf(['audit-plugins', 'esm', 'supabase'])
+    const stack = stackOf(['audit-plugins', 'oxlint-plugins', 'esm', 'supabase'])
     const targets = recommendForStack(
       stack,
       request({ level: 'basic', domains: ['security'] }),

@@ -66,7 +66,7 @@ export async function loadOxlintConfig(configPath: string): Promise<LoadedOxlint
     throw new TypeError(`${configPath} must contain a JSON object at the top level.`)
   }
 
-  return { path: configPath, existed: true, config: parsed as OxlintConfig, originalText }
+  return { path: configPath, existed: true, config: parsed, originalText }
 }
 
 /** True when the file carries comments that a rewrite would drop. */

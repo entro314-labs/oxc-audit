@@ -46,7 +46,7 @@ function isStableConstVariable(variable: Variable, declarator: ESTree.VariableDe
 	return (
 		declarator.parent.type === "VariableDeclaration" &&
 		declarator.parent.kind === "const" &&
-		variable.references.every((reference) => reference.init || !reference.isWrite())
+		variable.references.every((reference) => reference.init ?? !reference.isWrite())
 	);
 }
 
