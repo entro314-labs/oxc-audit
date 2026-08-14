@@ -162,6 +162,7 @@ describe('auditConfigFiles', () => {
     const dir = await setupProject({
       'package.json': JSON.stringify({ name: 'app', dependencies: { next: '^16.3.0' } }),
       'tsconfig.json': JSON.stringify({
+        include: ['src'],
         compilerOptions: { baseUrl: '.', moduleResolution: 'node', strict: true },
       }),
     })
@@ -178,6 +179,7 @@ describe('auditConfigFiles', () => {
     const dir = await setupProject({
       'package.json': JSON.stringify({ name: 'app', dependencies: {} }),
       'tsconfig.json': JSON.stringify({
+        include: ['src'],
         compilerOptions: { baseUrl: '.', moduleResolution: 'node', strict: true },
       }),
     })
@@ -185,11 +187,33 @@ describe('auditConfigFiles', () => {
     expect(await auditConfigFiles(dir, new CollectingReporter())).toEqual([])
   })
 
+  it('reports a tsconfig that states no compilation scope', async () => {
+    const dir = await setupProject({
+      'tsconfig.json': JSON.stringify({ compilerOptions: { strict: true } }),
+    })
+
+    // Unscoped, so `tsc` and the type-aware linter both walk the whole project root.
+    expect(keys(await auditConfigFiles(dir, new CollectingReporter()))).toEqual([
+      'tsconfig.json:include',
+    ])
+  })
+
+  it('stays quiet when either include or files states the scope', async () => {
+    for (const scope of [{ include: ['src'] }, { files: ['src/index.ts'] }]) {
+      const dir = await setupProject({
+        'tsconfig.json': JSON.stringify({ ...scope, compilerOptions: { strict: true } }),
+      })
+
+      expect(await auditConfigFiles(dir, new CollectingReporter())).toEqual([])
+    }
+  })
+
   it('parses a tsconfig containing comments rather than skipping its checks', async () => {
     const dir = await setupProject({
       'tsconfig.json': [
         '{',
         '  // the default template ships with comments',
+        '  "include": ["src"],',
         '  "compilerOptions": {',
         '    "strict": false,',
         '  },',
