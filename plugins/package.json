@@ -1,0 +1,41 @@
+{
+	"name": "oxlint-plugin-audit",
+	"version": "0.1.0",
+	"private": true,
+	"description": "Oxlint rules extracted from the version-locked stack audit prompts: deprecated APIs, migration residue and security footguns across Next.js/React, the data layer, AI SDK/payment integrations and the JS toolchain.",
+	"type": "module",
+	"exports": {
+		"./next-react": "./src/next-react/index.ts",
+		"./data-layer": "./src/data-layer/index.ts",
+		"./ai-integrations": "./src/ai-integrations/index.ts",
+		"./ts-tooling": "./src/ts-tooling/index.ts",
+		"./slop-stop": "./src/slop-stop/index.ts",
+		"./supabase": "./src/supabase/index.ts",
+		"./web-security": "./src/web-security/index.ts"
+	},
+	"files": [
+		"oxlintrc.audit.json",
+		"src"
+	],
+	"scripts": {
+		"check": "pnpm lint && pnpm typecheck && pnpm test && pnpm test:fixtures && pnpm check:skill-assets",
+		"lint": "oxlint src",
+		"test": "for f in src/*/rules/*.test.ts; do echo \"  $f\" && tsx \"$f\" || exit 1; done",
+		"test:fixtures": "oxlint -c oxlintrc.audit.json --deny-warnings fixtures > /dev/null 2>&1 && echo 'fixtures produced no findings — the integration fixture has regressed' && exit 1 || echo 'fixtures still trip the plugins'",
+		"typecheck": "tsc --noEmit",
+		"sync:skill-assets": "node scripts/sync-skill-assets.mjs",
+		"check:skill-assets": "node scripts/sync-skill-assets.mjs --check"
+	},
+	"dependencies": {
+		"@oxlint/plugins": "1.78.0"
+	},
+	"devDependencies": {
+		"@types/node": "26.2.0",
+		"oxlint": "1.78.0",
+		"oxlint-tsgolint": "7.0.2001",
+		"tsx": "4.23.12",
+		"typescript": "7.0.2"
+	},
+	"packageManager": "pnpm@11.21.0",
+	"license": "MIT"
+}

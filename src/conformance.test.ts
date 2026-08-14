@@ -341,3 +341,83 @@ describe('Vue targeted rules', () => {
     expect(rules.filter((rule) => rule.startsWith('vue/'))).toEqual([])
   })
 })
+
+/**
+ * Every level has to produce a config Oxlint accepts, not just the default one.
+ *
+ * The higher levels reach categories the tool never wrote before - `restriction` and
+ * `style` - and enable most of tsgolint's rule set. A level that emits something Oxlint
+ * rejects at load time would leave the project with no working lint at all.
+ */
+describe('every level produces a config Oxlint accepts', () => {
+  const levels = ['basic', 'recommended', 'strict', 'paranoid'] as const
+
+  for (const level of levels) {
+    it(`loads and runs at --${level}`, async () => {
+      const dir = await setupProject(REACT_PROJECT)
+      const report = await audit({ projectDir: dir, level, write: true })
+
+      expect(report.success).toBe(true)
+
+      // `--print-config` reports resolved severities in Oxlint's own vocabulary, where
+      // `error` comes back as `deny`.
+      const resolved = await printResolvedConfig(dir, join(dir, '.oxlintrc.json'))
+      expect(resolved.categories?.correctness).toBe('deny')
+
+      // A rejected config prints a parse failure rather than diagnostics.
+      const { stderr } = await run(['--config', '.oxlintrc.json', '.'], dir)
+      expect(stderr).not.toMatch(/Failed to parse|invalid|unknown rule/iu)
+    })
+  }
+
+  it('reaches strictly more categories as the level climbs', async () => {
+    const counts: number[] = []
+
+    for (const level of levels) {
+      const dir = await setupProject(REACT_PROJECT)
+      await audit({ projectDir: dir, level, write: true })
+      const resolved = await printResolvedConfig(dir, join(dir, '.oxlintrc.json'))
+      counts.push(Object.keys(resolved.categories ?? {}).length)
+    }
+
+    expect(counts).toEqual([...counts].sort((left, right) => left - right))
+    expect(counts.at(-1)).toBeGreaterThan(counts[0] ?? 0)
+  })
+
+  it('never enables the nursery category, whose rules are unstable upstream', async () => {
+    const dir = await setupProject(REACT_PROJECT)
+    await audit({ projectDir: dir, level: 'paranoid', maximal: true, write: true })
+
+    const resolved = await printResolvedConfig(dir, join(dir, '.oxlintrc.json'))
+    expect(resolved.categories?.nursery).toBeUndefined()
+  })
+})
+
+describe('the formatter config', () => {
+  it('writes an oxfmt config Oxlint-adjacent tooling can read back', async () => {
+    const dir = await setupProject({
+      ...REACT_PROJECT,
+      '.prettierrc': JSON.stringify({ semi: false, singleQuote: true, printWidth: 100 }),
+    })
+    const report = await audit({ projectDir: dir, format: true, write: true })
+
+    expect(report.format?.written).toBe(true)
+    expect(report.format?.carriedFrom).toBe('prettier')
+
+    const written = JSON.parse(await readFile(join(dir, '.oxfmtrc.jsonc'), 'utf-8')) as Record<
+      string,
+      unknown
+    >
+
+    expect(written.semi).toBe(false)
+    expect(written.singleQuote).toBe(true)
+    expect(written.printWidth).toBe(100)
+  })
+
+  it('writes nothing when --format was not asked for', async () => {
+    const dir = await setupProject(REACT_PROJECT)
+    const report = await audit({ projectDir: dir, write: true })
+
+    expect(report.format).toBeUndefined()
+  })
+})

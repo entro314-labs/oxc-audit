@@ -35,7 +35,7 @@ export async function findOxlintConfig(projectDir: string): Promise<string | und
  *
  * Parsed leniently with jsonc-parser: Oxlint accepts comments and trailing commas in its
  * config, and a config the tool itself accepts must not be rejected here. Note that
- * comments are lost on write — {@link LoadedOxlintConfig.originalText} is kept so a
+ * comments are lost on write - {@link LoadedOxlintConfig.originalText} is kept so a
  * caller can tell the user what they are about to lose.
  */
 export async function loadOxlintConfig(configPath: string): Promise<LoadedOxlintConfig> {

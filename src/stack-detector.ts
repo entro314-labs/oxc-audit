@@ -80,6 +80,9 @@ const CONFIG_FILE_SIGNALS: Array<{ id: StackSignalId; files: string[] }> = [
   // `package.json#workspaces` is only one of several conventions; pnpm, Lerna and Nx each
   // declare a workspace somewhere else entirely.
   { id: 'monorepo', files: ['pnpm-workspace.yaml', 'pnpm-workspace.yml', 'lerna.json', 'nx.json'] },
+  // The install skill copies the plugins into the tree rather than adding a dependency,
+  // so a vendored copy has to count as the package being present.
+  { id: 'audit-plugins', files: ['tools/oxlint/audit-plugins'] },
 ]
 
 /** Dependency names that establish a signal, matched exactly. */
@@ -98,6 +101,21 @@ const DEPENDENCY_SIGNALS: Array<{ id: StackSignalId; packages: string[] }> = [
   // The engine behind Oxlint's type-aware rules. Without it `oxlint --type-aware` fails
   // with "Failed to find tsgolint executable", so its presence gates those rules.
   { id: 'tsgolint', packages: ['oxlint-tsgolint'] },
+  { id: 'zod', packages: ['zod'] },
+  { id: 'tanstack-query', packages: ['@tanstack/react-query', '@tanstack/vue-query'] },
+  { id: 'zustand', packages: ['zustand'] },
+  { id: 'react-hook-form', packages: ['react-hook-form'] },
+  { id: 'drizzle', packages: ['drizzle-orm'] },
+  { id: 'ai-sdk', packages: ['ai'] },
+  { id: 'stripe', packages: ['stripe'] },
+  {
+    id: 'supabase',
+    packages: ['@supabase/supabase-js', '@supabase/ssr', '@supabase/server'],
+  },
+  { id: 'vite', packages: ['vite'] },
+  // Supplies the js plugins. Without it a `jsPlugins` entry names a file that does not
+  // exist and Oxlint refuses to start, so its presence gates those recommendations.
+  { id: 'audit-plugins', packages: ['oxlint-plugin-audit'] },
 ]
 
 /** Extensions that establish a signal by their presence in the source tree. */
@@ -112,8 +130,8 @@ const EXTENSION_SIGNALS: Array<{ id: StackSignalId; extensions: string[] }> = [
 /**
  * Reads the project's stack off disk.
  *
- * Every signal is a fact — a declared dependency, a config file that exists, an extension
- * actually present in the tree — recorded with the evidence that established it. Nothing
+ * Every signal is a fact - a declared dependency, a config file that exists, an extension
+ * actually present in the tree - recorded with the evidence that established it. Nothing
  * here infers or guesses, so the same project always produces the same stack.
  */
 export async function detectStack(
@@ -181,6 +199,43 @@ export async function detectStack(
 /** True when the stack carries the given signal. */
 export function hasSignal(stack: ProjectStack, id: StackSignalId): boolean {
   return stack.signals.some((signal) => signal.id === id)
+}
+
+/**
+ * Merge signals asserted on the command line into a detected stack.
+ *
+ * A `--react`-style flag is recorded as `flag` evidence rather than bypassing the pipeline,
+ * so plugin selection, rule gating and the reported `triggeredBy` trail all keep working
+ * unchanged, and the report can still say exactly why each recommendation appeared. A flag
+ * for something already detected adds its evidence beside the existing evidence rather than
+ * replacing it, so the detected fact is not hidden by the assertion.
+ *
+ * Determinism is unaffected: flags are inputs, and the same inputs still produce the same
+ * output.
+ */
+export function withForcedSignals(
+  stack: ProjectStack,
+  forced: readonly StackSignalId[],
+): ProjectStack {
+  if (forced.length === 0) {
+    return stack
+  }
+
+  const signals = stack.signals.map((signal) => ({ ...signal, evidence: [...signal.evidence] }))
+
+  for (const id of forced) {
+    const evidence: Evidence = { kind: 'flag', value: `--${id}` }
+    const existing = signals.find((signal) => signal.id === id)
+
+    if (existing) {
+      existing.evidence.push(evidence)
+      continue
+    }
+
+    signals.push({ id, evidence: [evidence] })
+  }
+
+  return { ...stack, signals: signals.sort((left, right) => left.id.localeCompare(right.id)) }
 }
 
 async function readManifest(

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin.json",
+  "name": "oxc-audit-plugins",
+  "version": "0.1.0",
+  "description": "Install and act on the oxlint-plugin-audit rule sets. Adds skills that copy the next-react, data-layer, ai-integrations, ts-tooling and slop-stop Oxlint plugins into a repository, select the ones its dependencies justify, and work through the findings that have no safe autofix.",
+  "author": {
+    "name": "Dominikos Pritis",
+    "email": "hey@myroomie.gr"
+  },
+  "homepage": "https://github.com/entro314-labs/oxc-audit",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/entro314-labs/oxc-audit.git"
+  },
+  "license": "MIT"
+}

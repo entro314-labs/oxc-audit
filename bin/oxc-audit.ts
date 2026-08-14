@@ -10,10 +10,14 @@ import { z } from 'zod'
 import { findClosestPackageJson, readJsonFile } from '../src/fs-utils.js'
 import { audit, auditWorkspace } from '../src/index.js'
 import { DefaultReporter } from '../src/reporter.js'
+import { AUDIT_DOMAINS, AUDIT_LEVELS } from '../src/types.js'
 import type {
+  AuditDomain,
+  AuditLevel,
   AuditOptions,
   AuditReport,
   Recommendation,
+  StackSignalId,
   WorkspaceAuditReport,
 } from '../src/types.js'
 
@@ -28,6 +32,8 @@ interface CliRuntimeOptions {
 }
 
 interface ParsedCliOptions {
+  /** Every level, domain and stack flag arrives here as an optional boolean. */
+  [flag: string]: boolean | string | number | undefined
   config?: string
   dir?: string
   write?: boolean
@@ -79,13 +85,28 @@ export async function runCli(
     stderr,
   })
 
+  let request
+  try {
+    request = {
+      level: resolveLevel(options),
+      domains: resolveDomains(options),
+      maximal: options.dom === true,
+      forcedSignals: resolveForcedSignals(options),
+    }
+  } catch (err) {
+    stderr.write(`${pc.red('✖')} ${err instanceof Error ? err.message : String(err)}\n`)
+    return 1
+  }
+
   const auditOptions: AuditOptions = {
     projectDir: options.dir,
     configPath: options.config,
+    ...request,
     write: options.write ?? false,
     noBackup: options.backup === false,
     maxFiles: options.maxFiles,
     maxDepth: options.maxDepth,
+    format: options.format === true,
     verbose: options.verbose ?? false,
     signal: runtimeOptions.signal,
   }
@@ -160,10 +181,104 @@ function buildCommand(
       'Directory depth to search for workspace packages',
       parsePositiveInteger,
     )
+    .option('--format', 'Also write an oxfmt formatter config beside the linter config')
     .option('--json', 'Print the audit report as JSON to stdout')
     .option('-v, --verbose', 'Show detailed progress information')
 
+  for (const level of AUDIT_LEVELS) {
+    command.option(`--${level}`, LEVEL_HELP[level])
+  }
+
+  for (const domain of AUDIT_DOMAINS) {
+    command.option(`--${domain}`, `Enable the ${domain} rule set regardless of the level`)
+  }
+
+  for (const [flag, signals] of Object.entries(STACK_FLAGS)) {
+    command.option(`--${flag}`, `Audit as if ${formatList(signals)} present`)
+  }
+
+  command.option(
+    '--dom',
+    'Every rule the detected stack could justify: the paranoid level with every domain on',
+  )
+
   return command
+}
+
+/** `a`, `b and c` - so a three-signal flag does not read as "a and b and c". */
+function formatList(items: readonly string[]): string {
+  const last = items.at(-1)
+
+  if (items.length <= 1) {
+    return `${last ?? 'nothing'} were`
+  }
+
+  return `${items.slice(0, -1).join(', ')} and ${last} were`
+}
+
+/** Levels, in ladder order, with the one-line help each flag shows. */
+const LEVEL_HELP: Record<AuditLevel, string> = {
+  basic: 'Correctness only - the smallest config that still catches real bugs',
+  recommended: 'Correctness and suspicious, plus the targeted rules (default)',
+  strict: 'Also pedantic and perf, and the type-aware rules that reject working code',
+  paranoid: 'Also restriction and style, and the whole-codebase policies',
+}
+
+/**
+ * Stack flags, and the signals each asserts.
+ *
+ * A flag is a claim about the project, not a rule set: it joins the detected stack as
+ * `flag` evidence and then travels the same path a detected signal would. `--next` implies
+ * React because Next.js projects are React projects, and the rules gated on `react` would
+ * otherwise be skipped on a forced Next.js audit.
+ */
+const STACK_FLAGS: Record<string, StackSignalId[]> = {
+  typescript: ['typescript', 'tsconfig'],
+  react: ['react', 'react-dom', 'jsx'],
+  next: ['nextjs', 'react', 'react-dom', 'jsx'],
+  vue: ['vue'],
+  svelte: ['svelte'],
+  astro: ['astro'],
+  node: ['node'],
+  vitest: ['vitest'],
+  jest: ['jest'],
+}
+
+/**
+ * Read the level off the parsed flags.
+ *
+ * Levels are mutually exclusive, so more than one is a mistake worth stopping for rather
+ * than silently resolving - the two readings (highest wins, last wins) disagree, and
+ * guessing would make the written config depend on argument order.
+ */
+function resolveLevel(options: ParsedCliOptions): AuditLevel {
+  const chosen = AUDIT_LEVELS.filter((level) => options[level] === true)
+
+  if (chosen.length > 1) {
+    throw new InvalidArgumentError(
+      `Levels are mutually exclusive; got ${chosen.map((level) => `--${level}`).join(' and ')}.`,
+    )
+  }
+
+  return chosen[0] ?? 'recommended'
+}
+
+function resolveDomains(options: ParsedCliOptions): AuditDomain[] {
+  return AUDIT_DOMAINS.filter((domain) => options[domain] === true)
+}
+
+function resolveForcedSignals(options: ParsedCliOptions): StackSignalId[] {
+  const forced = new Set<StackSignalId>()
+
+  for (const [flag, signals] of Object.entries(STACK_FLAGS)) {
+    if (options[flag] === true) {
+      for (const signal of signals) {
+        forced.add(signal)
+      }
+    }
+  }
+
+  return [...forced]
 }
 
 function parsePositiveInteger(value: string): number {
@@ -179,7 +294,11 @@ function parsePositiveInteger(value: string): number {
 function formatReport(report: AuditReport, write: boolean): string {
   const lines: string[] = ['']
 
-  const signals = report.stack.signals.map((signal) => signal.id)
+  // A signal asserted with a flag and never found on disk is marked, so the report never
+  // implies the project declares something it does not.
+  const signals = report.stack.signals.map((signal) =>
+    signal.evidence.every(({ kind }) => kind === 'flag') ? `${signal.id} (forced)` : signal.id,
+  )
   lines.push(
     pc.bold('Stack'),
     signals.length > 0 ? `  ${signals.join(', ')}` : '  nothing detected',
@@ -196,6 +315,39 @@ function formatReport(report: AuditReport, write: boolean): string {
   if (report.explicitlyDisabled.length > 0) {
     lines.push(pc.bold('Explicitly disabled in your config (left untouched)'))
     lines.push(...report.explicitlyDisabled.map((entry) => `  ${pc.dim(formatTarget(entry))}`), '')
+  }
+
+  if (report.configFindings.length > 0) {
+    // Reported, never applied: these live outside the Oxlint config this tool writes, and
+    // their fixes are codemods and version bumps rather than key edits.
+    lines.push(pc.bold('Configuration findings (not applied)'))
+    for (const found of report.configFindings) {
+      const label =
+        found.severity === 'error'
+          ? pc.red(found.severity)
+          : found.severity === 'warning'
+            ? pc.yellow(found.severity)
+            : pc.dim(found.severity)
+      lines.push(
+        `  ${label} ${pc.cyan(`${found.file}:${found.key}`)} - ${found.title}`,
+        `      ${pc.dim(found.detail)}`,
+      )
+    }
+    lines.push('')
+  }
+
+  if (report.format) {
+    const { path, added, carriedFrom, written, existed } = report.format
+    lines.push(pc.bold(written ? 'Formatter config written' : 'Formatter config'))
+    lines.push(
+      added.length > 0
+        ? `  ${pc.cyan(path)} - ${added.length} setting(s): ${added.join(', ')}`
+        : `  ${pc.cyan(path)} - nothing to add${existed ? '; every key is already set' : ''}`,
+    )
+    if (carriedFrom) {
+      lines.push(`      ${pc.dim(`Settings carried across from the ${carriedFrom} config.`)}`)
+    }
+    lines.push('')
   }
 
   if (report.prerequisites.length > 0) {
@@ -223,7 +375,7 @@ function formatReport(report: AuditReport, write: boolean): string {
   const satisfied = report.alreadySatisfied.length
   lines.push(
     report.recommendations.length === 0
-      ? pc.green(`Nothing to add — ${satisfied} recommendation(s) already satisfied.`)
+      ? pc.green(`Nothing to add - ${satisfied} recommendation(s) already satisfied.`)
       : write && report.config.written
         ? pc.green(`Wrote ${report.recommendations.length} change(s) to ${report.config.path}`)
         : pc.dim(`Run with --write to apply these to ${report.config.path}`),
@@ -237,7 +389,9 @@ function formatWorkspaceReport(workspace: WorkspaceAuditReport, write: boolean):
   const sections = [pc.bold(pc.underline('Workspace root')), formatReport(workspace.root, write)]
 
   for (const { relativeDir, report } of workspace.packages) {
-    const counts = `${report.recommendations.length} to add, ${report.alreadySatisfied.length} satisfied`
+    const findings =
+      report.configFindings.length > 0 ? `, ${report.configFindings.length} config finding(s)` : ''
+    const counts = `${report.recommendations.length} to add, ${report.alreadySatisfied.length} satisfied${findings}`
     sections.push(pc.bold(pc.underline(relativeDir)), pc.dim(`  ${counts}`), '')
 
     // Only the actionable part is expanded per package; the full detail is in --json.
@@ -271,8 +425,11 @@ function formatRecommendation(recommendation: Recommendation): string {
 
 function formatTarget(recommendation: Recommendation): string {
   const severity = recommendation.severity ? `: ${recommendation.severity}` : ''
+  // The path is the whole substance of a js-plugin entry, so it belongs in the line
+  // rather than only in the written config.
+  const specifier = recommendation.specifier ? pc.dim(` -> ${recommendation.specifier}`) : ''
 
-  return `${pc.cyan(recommendation.kind)} ${recommendation.target}${severity}`
+  return `${pc.cyan(recommendation.kind)} ${recommendation.target}${severity}${specifier}`
 }
 
 async function loadCliPackageMetadata(): Promise<z.infer<typeof CliPackageMetadataSchema>> {
@@ -308,7 +465,7 @@ export function createTerminationHandler(
  * `../oxc-audit/dist/bin/oxc-audit.mjs`). Node resolves symlinks when it builds
  * `import.meta.url` but leaves `process.argv[1]` pointing at the link, so comparing the
  * two raw paths only ever matches when the file is run by its real path. Invoked through
- * the link — which is every `npx oxc-audit` and every `node_modules/.bin` call — the
+ * the link - which is every `npx oxc-audit` and every `node_modules/.bin` call - the
  * comparison fails and the CLI exits silently having parsed nothing. Both sides are
  * resolved to their real paths before comparing.
  */

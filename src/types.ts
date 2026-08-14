@@ -63,7 +63,19 @@ export interface OxlintConfig {
   settings?: OxlintSettings
 }
 
-/** How a signal was established. Every signal is a fact read off disk, never a guess. */
+/**
+ * An oxfmt configuration.
+ *
+ * Deliberately open: oxfmt's surface is 88 options across seven groups, this tool writes a
+ * handful, and every other key in an existing file has to survive a merge untouched.
+ * `docs/oxfmt-rules.tsv` is the tracked inventory the written keys are checked against.
+ */
+export type OxfmtConfig = Record<string, unknown>
+
+/**
+ * How a signal was established. Every signal is a fact - read off disk, or stated by the
+ * user on the command line. Nothing is ever inferred.
+ */
 export type EvidenceKind =
   | 'dependency'
   | 'dev-dependency'
@@ -71,6 +83,47 @@ export type EvidenceKind =
   | 'config-file'
   | 'source-extension'
   | 'tsconfig-field'
+  /** Asserted by a `--react`-style flag. The user overrides detection; the run stays deterministic. */
+  | 'flag'
+
+/**
+ * How much the audit asks for, as a ladder. Each level is a superset of the one below.
+ *
+ * The levels map onto Oxlint's own categories, so they mean the same thing here as they do
+ * in a hand-written config: `basic` is correctness alone, and `paranoid` reaches into the
+ * opinionated categories most projects leave off.
+ */
+export type AuditLevel = 'basic' | 'recommended' | 'strict' | 'paranoid'
+
+/** Cross-cutting rule sets that ignore the level ladder when explicitly asked for. */
+export type AuditDomain = 'security' | 'performance' | 'accessibility'
+
+export const AUDIT_LEVELS: readonly AuditLevel[] = [
+  'basic',
+  'recommended',
+  'strict',
+  'paranoid',
+] as const
+
+export const AUDIT_DOMAINS: readonly AuditDomain[] = [
+  'security',
+  'performance',
+  'accessibility',
+] as const
+
+/** What the user asked for, independent of what the project turned out to contain. */
+export interface AuditRequest {
+  level: AuditLevel
+  domains: AuditDomain[]
+  /**
+   * `--dom`: every rule the detected stack could justify. Raises the level to `paranoid`
+   * and turns on every domain, but changes nothing about evidence - a rule with no signal
+   * behind it is still never recommended.
+   */
+  maximal: boolean
+  /** Signals asserted on the command line, merged into the detected stack as `flag` evidence. */
+  forcedSignals: StackSignalId[]
+}
 
 export interface Evidence {
   kind: EvidenceKind
@@ -101,6 +154,19 @@ export type StackSignalId =
   | 'jsdoc'
   | 'esm'
   | 'monorepo'
+  // Stacks the oxlint-plugin-audit plugins cover. Detected separately from the plugins
+  // themselves so the tool can say which plugins would apply before any are installed.
+  | 'zod'
+  | 'tanstack-query'
+  | 'zustand'
+  | 'react-hook-form'
+  | 'drizzle'
+  | 'ai-sdk'
+  | 'stripe'
+  | 'supabase'
+  | 'vite'
+  /** The audit plugin package itself, as a dependency or a copy under `tools/`. */
+  | 'audit-plugins'
 
 export interface ProjectStack {
   projectDir: string
@@ -116,15 +182,42 @@ export interface ProjectStack {
 
 /** A single recommended change to the Oxlint config, with its justification. */
 export interface Recommendation {
-  kind: 'plugin' | 'category' | 'rule' | 'option'
+  kind: 'plugin' | 'js-plugin' | 'category' | 'rule' | 'option'
   /** Plugin name, category name, rule name, or `options` key. */
   target: string
   /** Severity for category/rule recommendations. */
   severity?: OxlintSeverity
+  /**
+   * Module path for `js-plugin` recommendations. Resolved from where the plugin package
+   * was actually found, so the written config points at a file that exists.
+   */
+  specifier?: string
   /** Why this is recommended, phrased for a human reading the report. */
   reason: string
   /** The signals that triggered it. */
   triggeredBy: StackSignalId[]
+}
+
+/** How much a configuration finding matters. */
+export type ConfigFindingSeverity = 'error' | 'warning' | 'info'
+
+/**
+ * A finding in a project configuration file.
+ *
+ * Distinct from a {@link Recommendation}: a recommendation changes the Oxlint config, while
+ * a finding reports something wrong in a file Oxlint cannot read at all. Findings are never
+ * applied automatically - the fix is usually a codemod or a version bump, not a key edit.
+ */
+export interface ConfigFinding {
+  severity: ConfigFindingSeverity
+  /** Project-relative file the finding is in, e.g. `turbo.json`. */
+  file: string
+  /** Dotted path to the offending key, e.g. `tasks.build.outputs`. */
+  key: string
+  /** Short label, suitable for a summary line. */
+  title: string
+  /** What is wrong and what to do about it. */
+  detail: string
 }
 
 export interface AuditReport {
@@ -139,6 +232,11 @@ export interface AuditReport {
   recommendations: Recommendation[]
   /** Recommendations already satisfied by the existing config. */
   alreadySatisfied: Recommendation[]
+  /**
+   * Problems found in project configuration files. Reported only - these are outside the
+   * Oxlint config this tool writes, and their fixes are codemods and version bumps.
+   */
+  configFindings: ConfigFinding[]
   /**
    * Capabilities the project could adopt but has not installed the tooling for. Reported
    * rather than configured, because writing config for a missing engine would produce a
@@ -157,6 +255,20 @@ export interface AuditReport {
     written: boolean
     changed: boolean
   }
+  /** The formatter half of the run. Absent unless `--format` asked for it. */
+  format?: FormatConfigReport
+}
+
+/** What happened to the formatter config, when `--format` asked for one. */
+export interface FormatConfigReport {
+  path: string
+  existed: boolean
+  /** True when the file was written (false in dry-run or when nothing was missing). */
+  written: boolean
+  /** Keys added by this run. Existing keys are decisions and are never overwritten. */
+  added: string[]
+  /** The tool whose settings were carried across, when one was found. */
+  carriedFrom: 'prettier' | 'biome' | undefined
 }
 
 export interface Prerequisite {
@@ -190,6 +302,16 @@ export interface AuditOptions {
   maxFiles?: number
   /** Directory depth to search for workspace packages. */
   maxDepth?: number
+  /** How much to ask for. Defaults to `recommended`. */
+  level?: AuditLevel
+  /** Cross-cutting rule sets to enable regardless of the level. */
+  domains?: AuditDomain[]
+  /** `--dom`: every rule the detected stack could justify. */
+  maximal?: boolean
+  /** Signals to assert regardless of what the project declares. */
+  forcedSignals?: StackSignalId[]
+  /** Also write a formatter config beside the linter config. */
+  format?: boolean
   verbose?: boolean
   signal?: AbortSignal
 }

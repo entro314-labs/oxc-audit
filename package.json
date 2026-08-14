@@ -1,13 +1,16 @@
 {
   "name": "oxc-audit",
-  "version": "1.0.0",
-  "description": "Deterministically audit a project's stack and recommend the Oxlint rules it is missing",
+  "version": "1.0.1",
+  "description": "Deterministically audit a project's stack and configure the Oxc toolchain around it - oxlint, tsgolint and oxfmt",
   "keywords": [
     "audit",
+    "formatter",
     "linter",
     "oxc",
+    "oxfmt",
     "oxlint",
     "static-analysis",
+    "tsgolint",
     "typescript"
   ],
   "license": "MIT",
@@ -48,6 +51,7 @@
     "commander": "15.0.0",
     "jsonc-parser": "4.0.0-next.2",
     "picocolors": "^1.1.1",
+    "yaml": "2.9.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {

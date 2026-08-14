@@ -1,16 +1,32 @@
 # oxc-audit
 
-Read a project's stack off disk and recommend the Oxlint rules it is missing.
+Read a project's stack off disk and configure the Oxc toolchain around it.
 
-`oxc-audit` scans a project — declared dependencies, config files, the real source tree —
-and works out which of Oxlint's fifteen plugins actually apply. It reports what to add, or
-adds it for you. Run it on a project with no Oxlint config to get a sensible starting
-point, or on one that already has a config to see what the stack has outgrown.
+`oxc-audit` scans a project - declared dependencies, config files, the real source tree -
+and works out what actually applies: which of Oxlint's fifteen plugins, which of tsgolint's
+type-aware rules, which custom plugins, and what the formatter should be set to. It reports
+what to add, or adds it for you. Run it on a project with no Oxc config to get a sensible
+starting point, or on one that already has a config to see what the stack has outgrown.
 
 ```bash
-npx oxc-audit            # report only
-npx oxc-audit --write    # apply the recommendations
+npx oxc-audit                      # report only
+npx oxc-audit --write              # apply the recommendations
+npx oxc-audit --strict --security  # ask for more
+npx oxc-audit --write --format     # configure the formatter too
 ```
+
+Four tools, one pass:
+
+| Tool                  | What it gets                                                    | Written to       |
+| --------------------- | --------------------------------------------------------------- | ---------------- |
+| `oxlint`              | Plugins, categories and targeted rules for the detected stack   | `.oxlintrc.json` |
+| `oxlint-tsgolint`     | Type-aware rules, scaled by level, when the engine is installed | `.oxlintrc.json` |
+| `oxlint-plugin-audit` | Custom plugins for the frameworks and libraries in use          | `.oxlintrc.json` |
+| `oxfmt`               | Formatter settings, carried over from Prettier or Biome         | `.oxfmtrc.jsonc` |
+
+Nothing is written for a tool that is not installed. Where a capability is wanted but its
+engine is missing, it is reported as a prerequisite rather than configured, because a config
+naming a missing engine is one Oxlint refuses to start on.
 
 ## What it does
 
@@ -24,7 +40,7 @@ Recommended
       React is a dependency, so the react rules apply.
   plugin jsx-a11y [jsx]
       JSX is present, so the accessibility rules have something to check.
-  rule react/jsx-no-target-blank: error [jsx]
+  rule react/jsx-no-target-blank: error [react, nextjs]
       `target="_blank"` without `rel="noreferrer"` exposes `window.opener`.
 
   Run with --write to apply these to /project/.oxlintrc.json
@@ -32,6 +48,94 @@ Recommended
 
 Every recommendation names the signals that triggered it and why it exists. Nothing is
 recommended without evidence in the project.
+
+## Levels
+
+How much to ask for. Each level is a strict superset of the one below, and they map onto
+Oxlint's own categories, so they mean here what they mean in a hand-written config.
+
+| Level                       | Categories                 | Type-aware rules                                        |
+| --------------------------- | -------------------------- | ------------------------------------------------------- |
+| `--basic`                   | `correctness`              | none - the config stays fast and quiet                  |
+| `--recommended` _(default)_ | `+ suspicious`             | the ~27 that find genuinely unsound code                |
+| `--strict`                  | `+ pedantic`, `+ perf`     | `+ ~27` that are right but reject a lot of working code |
+| `--paranoid`                | `+ restriction`, `+ style` | `+ 5` whole-codebase policies                           |
+
+`nursery` is never enabled at any level: its rules are explicitly unstable upstream, and a
+config that changes meaning when Oxlint patches would break the determinism this tool exists
+to provide.
+
+`--dom` is the maximal switch - `--paranoid` with every domain turned on at once. It changes
+nothing about evidence: a rule with no signal behind it is still never recommended.
+
+## Domains
+
+Cross-cutting sets that ignore the ladder. `--security` on a `--basic` run still gets the
+whole security set, and nothing else moves.
+
+| Flag              | Covers                                                                                            |
+| ----------------- | ------------------------------------------------------------------------------------------------- |
+| `--security`      | The injection primitives, cookie and iframe rules, plus the `web-security` and `supabase` plugins |
+| `--performance`   | Oxlint's `perf` category, `react-perf`, and the quadratic-loop and context-value rules            |
+| `--accessibility` | 17 `jsx-a11y` rules that are off by default, at `error`                                           |
+
+## Forcing a stack
+
+`--react`, `--next`, `--vue`, `--svelte`, `--astro`, `--typescript`, `--node`, `--vitest`
+and `--jest` assert a signal the project does not declare. A flag is a claim about the
+project rather than a rule set: it joins the detected stack as `flag` evidence and then
+travels the same path a detected signal would, so the report still explains every
+recommendation. Anything reached only by a flag is marked:
+
+```
+Stack
+  esm, typescript, vue (forced)
+```
+
+`--next` implies React, because a Next.js project is a React project and the rules gated on
+`react` would otherwise be skipped.
+
+## The formatter
+
+`--format` writes `.oxfmtrc.jsonc` beside the linter config, under the same additive rule: a
+key already present is a decision and is never overwritten, so a second run is a no-op.
+
+An existing Prettier or Biome config wins over every default - the codebase is already
+formatted that way, and imposing different settings would rewrite every file on the first
+run. Biome's spellings are translated (`indentStyle` → `useTabs`, `lineWidth` →
+`printWidth`, `quoteStyle` → `singleQuote`). Keys with no oxfmt equivalent are left behind
+rather than guessed at, and a `prettier.config.js` is reported rather than executed -
+running a project's config file to find out how it formats is not something an audit should
+do.
+
+## Configuration findings
+
+Oxlint only reads JavaScript and TypeScript. A large share of what goes wrong in a project
+lives in files it cannot see at all - so those are checked here instead, and reported
+separately from the Oxlint recommendations:
+
+```
+Configuration findings (not applied)
+  error   turbo.json:pipeline - Turborepo 1.x `pipeline` key
+      Turborepo 2 renamed `pipeline` to `tasks`. Run `npx @turbo/codemod migrate`.
+  error   pnpm-workspace.yaml:onlyBuiltDependencies - Setting removed in pnpm 11
+      `onlyBuiltDependencies` was consolidated in pnpm 11 and is no longer read.
+  error   package.json:dependencies.next - Dependency below its security floor
+      `next@^16.2.9` can resolve to 16.2.9, below the 16.2.11 floor that fixes
+      the July 2026 monthly set, CVE-2026-64641..64649. Raise the range.
+```
+
+| File                  | Checked for                                                                                                         |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `turbo.json`          | The Turborepo 1.x `pipeline` key; build tasks with no `outputs`; `cache: false`                                     |
+| `pnpm-workspace.yaml` | Settings consolidated into `allowBuilds` in pnpm 11; `auditConfig.ignoreCves`; protective defaults turned off       |
+| `package.json`        | Dependencies below a published security floor; `engines.node` below what a dependency requires                      |
+| `tsconfig.json`       | `baseUrl` and `moduleResolution: "node"` under Next.js 16.3, which stopped suppressing their warnings; `strict` off |
+
+**These are never applied.** They sit outside the configs this tool writes, and their
+fixes are codemods and version bumps rather than key edits. A version range the checker
+cannot reduce to a minimum is reported as `info` rather than assumed safe, and a malformed
+config file is skipped with a warning rather than aborting the audit.
 
 ## Two properties it guarantees
 
@@ -43,7 +147,7 @@ is what makes it safe in CI.
 **Additive.** A run can only ever add checks. Three invariants hold for any input:
 
 1. **Nothing is removed.** No rule, plugin, category, override, or unrecognised field is
-   dropped — including fields this tool does not understand.
+   dropped - including fields this tool does not understand.
 2. **Nothing is weakened.** A rule already at `error` stays at `error` when only `warn` is
    recommended. Rule options survive a severity change. Enabling a plugin carries Oxlint's
    base set along, because [setting `plugins` overwrites that base set][plugins-note] and
@@ -63,18 +167,22 @@ Those invariants are asserted directly, over a matrix of existing configs, in
 | `typescript`          | `typescript` dependency, `tsconfig.json`, or `.ts`/`.tsx`/`.mts`/`.cts` files |
 | `jsx`                 | `.jsx` or `.tsx` files                                                        |
 | `react` / `react-dom` | the corresponding dependency                                                  |
+| `nextjs`              | `next` dependency or `next.config.*`                                          |
+| `vue`                 | `vue`/`nuxt` dependency, `vue.config.*`/`nuxt.config.*`, or `.vue` files      |
+| `svelte`              | `svelte` dependency, `svelte.config.*`, or `.svelte` files                    |
+| `astro`               | `astro` dependency, `astro.config.*`, or `.astro` files                       |
+| `vitest` / `jest`     | the dependency or its config file                                             |
+| `node`                | `@types/node`, `engines.node`, or a `bin` field                               |
+| `esm`                 | `"type": "module"`                                                            |
+| `monorepo`            | `workspaces`, `pnpm-workspace.yaml`, `lerna.json`, or `nx.json`               |
+| `tsconfig`            | `tsconfig.json` (tracked separately - type-aware linting needs a real one)    |
+| `tsgolint`            | `oxlint-tsgolint` dependency                                                  |
+| `jsdoc`               | `jsdoc` or `typedoc` dependency                                               |
 
-| `nextjs` | `next` dependency or `next.config.*` |
-| `vue` | `vue`/`nuxt` dependency, `vue.config.*`/`nuxt.config.*`, or `.vue` files |
-| `svelte` | `svelte` dependency, `svelte.config.*`, or `.svelte` files |
-| `astro` | `astro` dependency, `astro.config.*`, or `.astro` files |
-| `vitest` / `jest` | the dependency or its config file |
-| `node` | `@types/node`, `engines.node`, or a `bin` field |
-| `esm` | `"type": "module"` |
-| `monorepo` | `workspaces`, `pnpm-workspace.yaml`, `lerna.json`, or `nx.json` |
-| `tsconfig` | `tsconfig.json` (tracked separately — type-aware linting needs a real one) |
-| `tsgolint` | `oxlint-tsgolint` dependency |
-| `jsdoc` | `jsdoc` or `typedoc` dependency |
+A further set of signals exists only to decide which custom plugins apply, and each is
+established by its dependency alone: `zod`, `tanstack-query`, `zustand`, `react-hook-form`,
+`drizzle`, `ai-sdk`, `stripe`, `supabase`, and `vite`. `audit-plugins` marks the plugin
+package itself, as a dependency or as a copy under `tools/oxlint/audit-plugins`.
 
 Dependencies are read from `dependencies`, `devDependencies`, and `peerDependencies`, so a
 monorepo leaf package that inherits a framework is still detected.
@@ -87,7 +195,7 @@ detected, and the missing plugin is reported rather than silently producing noth
 
 Dependency signals come from one manifest, so auditing only a workspace root
 under-reports: the frameworks live in the leaf packages. `--recurse` audits the root and
-every package beneath it, each against its own nearest config — which is also how Oxlint
+every package beneath it, each against its own nearest config - which is also how Oxlint
 resolves configs, since a child config is used on its own rather than merged into the
 parent's.
 
@@ -97,8 +205,8 @@ oxc-audit --recurse --write    # give each package its own config
 ```
 
 Packages are found by walking for `package.json`, skipping `node_modules` and build
-output. When the repo declares its packages — `package.json` workspaces,
-`pnpm-workspace.yaml`, or `lerna.json` — that declaration then filters the result,
+output. When the repo declares its packages - `package.json` workspaces,
+`pnpm-workspace.yaml`, or `lerna.json` - that declaration then filters the result,
 **including its exclusions**:
 
 ```yaml
@@ -132,31 +240,71 @@ capability is reported as a prerequisite instead:
 ```
 Available with an extra install
   Type-aware linting
-      3 type-aware rules (including no-floating-promises) need type information,
+      59 type-aware rules (including no-floating-promises) need type information,
       which Oxlint gets from the tsgolint engine.
       pnpm add -D oxlint-tsgolint
 ```
 
+All 59 rules tsgolint implements are placed on the level ladder, by how much working code
+each rejects rather than by how useful it is. `--recommended` carries the ones that find
+genuinely unsound code - the `no-unsafe-*` family, `no-floating-promises`, `only-throw-error`,
+`switch-exhaustiveness-check`. `--strict` adds the ones that are right but reject a great deal
+of working code. `--paranoid` adds the whole-codebase policies, `strict-boolean-expressions`
+and `prefer-readonly-parameter-types` among them. `--basic` carries none, and does not write
+`options.typeAware` at all, since the option exists only to load an engine that would have
+nothing to run.
+
 Recommended type-aware rules are checked against `docs/tsgolint-rules.tsv` **including its
-`status` column**, so a rule tsgolint has not implemented yet can never be recommended —
-that would configure something which silently never runs.
+`status` column**, so a rule tsgolint has not implemented yet can never be recommended -
+that would configure something which silently never runs. The reverse is checked too, against
+`docs/oxlint-vs-tsgolint.tsv`: a rule that needs type information can never be recommended
+outside the tsgolint gate, where Oxlint would accept it and it would never fire.
 
 ## Usage
 
 ```
-oxc-audit [options]
+Usage: oxc-audit [options]
 
-  -d, --dir <path>       Project directory to audit (default: current directory)
-  -c, --config <path>    Path to the Oxlint config (default: .oxlintrc.json)
-  -w, --write            Apply the recommendations. Without this the audit only reports.
-      --no-backup        Skip writing a .backup copy before applying changes
-  -r, --recurse          Also audit every package found beneath the directory
-      --max-files <n>    Maximum source files to scan before truncating
-      --max-depth <n>    Directory depth to search for workspace packages
-      --json             Print the audit report as JSON to stdout
-  -v, --verbose          Show detailed progress information
-  -h, --help             Display help
-  -V, --version          Display version
+Deterministically audit a project's stack and configure the Oxc toolchain around
+it - oxlint, tsgolint and oxfmt
+
+Options:
+  -V, --version        output the version number
+  -d, --dir <path>     Project directory to audit (default: current directory)
+  -c, --config <path>  Path to the Oxlint config (default: .oxlintrc.json)
+  -w, --write          Apply the recommendations. Without this the audit only
+                       reports.
+  --no-backup          Skip writing a .backup copy before applying changes
+  --max-files <count>  Maximum source files to scan before truncating
+  -r, --recurse        Also audit every package found beneath the directory
+  --max-depth <depth>  Directory depth to search for workspace packages
+  --format             Also write an oxfmt formatter config beside the linter
+                       config
+  --json               Print the audit report as JSON to stdout
+  -v, --verbose        Show detailed progress information
+  --basic              Correctness only - the smallest config that still catches
+                       real bugs
+  --recommended        Correctness and suspicious, plus the targeted rules
+                       (default)
+  --strict             Also pedantic and perf, and the type-aware rules that
+                       reject working code
+  --paranoid           Also restriction and style, and the whole-codebase
+                       policies
+  --security           Enable the security rule set regardless of the level
+  --performance        Enable the performance rule set regardless of the level
+  --accessibility      Enable the accessibility rule set regardless of the level
+  --typescript         Audit as if typescript and tsconfig were present
+  --react              Audit as if react, react-dom and jsx were present
+  --next               Audit as if nextjs, react, react-dom and jsx were present
+  --vue                Audit as if vue were present
+  --svelte             Audit as if svelte were present
+  --astro              Audit as if astro were present
+  --node               Audit as if node were present
+  --vitest             Audit as if vitest were present
+  --jest               Audit as if jest were present
+  --dom                Every rule the detected stack could justify: the paranoid
+                       level with every domain on
+  -h, --help           display help for command
 ```
 
 Exit code is `0` when the audit succeeds and `1` when it hits an error or a blocker.
@@ -166,16 +314,23 @@ Exit code is `0` when the audit succeeds and `1` when it hits an error or a bloc
 ```ts
 import { audit, detectStack, recommendForStack, mergeRecommendations } from 'oxc-audit'
 
-const report = await audit({ projectDir: process.cwd() })
+const report = await audit({
+  projectDir: process.cwd(),
+  level: 'strict',
+  domains: ['security'],
+  forcedSignals: ['react'],
+  format: true,
+})
 
 for (const recommendation of report.recommendations) {
-  console.log(recommendation.target, '←', recommendation.triggeredBy.join(', '))
+  console.log(recommendation.target, '<-', recommendation.triggeredBy.join(', '))
 }
 ```
 
 `detectStack`, `recommendForStack`, and `mergeRecommendations` are exported separately so
 you can substitute your own recommendation table while keeping the detection and the
-merge invariants.
+merge invariants. `recommendForStack` takes the same request the CLI builds, so a level
+and a set of domains produce the same result either way.
 
 ## Safety
 
@@ -199,7 +354,7 @@ rules here (`no-eval`, `no-new-func`, `no-script-url`, `react/no-danger`,
 having, and they are not a substitute for a SAST tool or dependency auditing.
 
 Rule selection stays proportional to what a plugin already covers. Oxlint's `correctness`
-category alone carries 33 of the 46 Vue rules, so only three Vue rules are hand-picked —
+category alone carries 33 of the 46 Vue rules, so only three Vue rules are hand-picked -
 the ones that are off by default _and_ name a concrete failure. The other ten
 off-by-default Vue rules are casing and declaration-style choices, which are yours to make.
 
@@ -221,9 +376,16 @@ enabled, that no previously-active plugin gets disabled, that `.vue`/`.svelte`/`
 files are genuinely linted rather than silently skipped, and that type-aware rules
 actually fire through the tsgolint engine.
 
-Recommended rule and plugin names are checked against the tracked inventories in
-`docs/oxlint-rules.tsv` and `docs/tsgolint-rules.tsv`, so a rename upstream fails the
-suite rather than shipping a config referencing a rule that no longer exists.
+Recommended rule and plugin names are checked against the tracked inventories in `docs/`,
+so a rename upstream fails the suite rather than shipping a config referencing a rule that
+no longer exists.
+
+| Inventory                | Covers                                                           | What it is checked for                                                                                 |
+| ------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `oxlint-rules.tsv`       | Every rule Oxlint ships, with its plugin                         | No recommended rule or plugin is invented                                                              |
+| `tsgolint-rules.tsv`     | Every tsgolint rule, with implementation status                  | No type-aware rule is recommended before tsgolint implements it                                        |
+| `oxlint-vs-tsgolint.tsv` | Every `typescript/*` rule, and whether it needs type information | No type-aware rule is recommended outside the tsgolint gate, where it would be accepted and never fire |
+| `oxfmt-rules.tsv`        | The oxfmt configuration surface                                  | Reference only - this tool does not write formatter config                                             |
 
 ### Releasing
 
