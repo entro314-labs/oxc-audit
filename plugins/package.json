@@ -1,6 +1,6 @@
 {
 	"name": "oxlint-plugin-audit",
-	"version": "0.1.0",
+	"version": "1.1.0",
 	"private": true,
 	"description": "Oxlint rules extracted from the version-locked stack audit prompts: deprecated APIs, migration residue and security footguns across Next.js/React, the data layer, AI SDK/payment integrations and the JS toolchain.",
 	"type": "module",
