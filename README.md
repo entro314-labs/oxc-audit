@@ -27,8 +27,7 @@ Four tools, one pass:
 Nothing is written for a tool that is not installed. Where a capability is wanted but its
 engine is missing, it is reported as a prerequisite rather than configured, because a config
 naming a missing engine is one Oxlint refuses to start on. That covers `oxlint-tsgolint` for
-type-aware rules and `@oxlint/plugins` for the custom plugins — without the latter, Oxlint
-fails to load a `jsPlugins` entry and refuses to start at all.
+the type-aware rules, and `oxlint-audit-plugins` for the custom ones.
 
 `--write` also adds `lint`, `lint:fix`, `format` and `format:check` scripts to `package.json`
 when they are absent, so there is something to run. An existing script of the same name is

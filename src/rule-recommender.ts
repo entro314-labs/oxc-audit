@@ -1016,9 +1016,24 @@ const AUDIT_PLUGINS: Array<{
  * A vendored copy and an installed dependency need different `jsPlugins` paths, and
  * guessing wrong produces a config Oxlint cannot load.
  */
-function auditPluginSpecifier(stack: ProjectStack, plugin: string): string {
+/** True when the plugins can actually be loaded: sources present, and a runtime to load them. */
+function hasAuditPluginRuntime(stack: ProjectStack): boolean {
+  if (!hasSignal(stack, 'audit-plugins')) {
+    return false
+  }
+
+  return !isVendoredPluginCopy(stack) || hasSignal(stack, 'oxlint-plugins')
+}
+
+/** True when the sources are a copy in the tree rather than an installed dependency. */
+function isVendoredPluginCopy(stack: ProjectStack): boolean {
   const signal = stack.signals.find(({ id }) => id === 'audit-plugins')
-  const vendored = signal?.evidence.some(({ kind }) => kind === 'config-file') ?? false
+
+  return signal?.evidence.every(({ kind }) => kind === 'config-file') ?? false
+}
+
+function auditPluginSpecifier(stack: ProjectStack, plugin: string): string {
+  const vendored = isVendoredPluginCopy(stack)
 
   // A dependency is named, not pathed. Oxlint resolves a bare specifier through the
   // package's `exports` map, which is what keeps the config working when the package
@@ -1125,10 +1140,12 @@ export function recommendForStack(
     }
   }
 
-  // Both halves are required: the sources to point at, and the runtime they import. A
-  // `jsPlugins` entry without `@oxlint/plugins` installed makes Oxlint fail to start, which
-  // would leave the project worse off than having no custom rules at all.
-  if (hasSignal(stack, 'audit-plugins') && hasSignal(stack, 'oxlint-plugins')) {
+  // The sources to point at, and the runtime they import. The published package declares
+  // `@oxlint/plugins` as a dependency, so installing it is enough; a copy vendored into the
+  // tree has no manifest to carry that, and needs the runtime declared separately. Getting
+  // this wrong either way is costly: a `jsPlugins` entry whose runtime is missing makes
+  // Oxlint refuse to start.
+  if (hasAuditPluginRuntime(stack)) {
     for (const { plugin, requires, reason, rules, domains: pluginDomains } of AUDIT_PLUGINS) {
       const triggeredBy = requires.filter((signal) => hasSignal(stack, signal))
 
@@ -1186,7 +1203,7 @@ export function findPrerequisites(stack: ProjectStack): Prerequisite[] {
     })
   }
 
-  if (!hasSignal(stack, 'audit-plugins') || !hasSignal(stack, 'oxlint-plugins')) {
+  if (!hasAuditPluginRuntime(stack)) {
     const applicable = AUDIT_PLUGINS.filter(({ requires }) =>
       requires.some((signal) => hasSignal(stack, signal)),
     ).map(({ plugin }) => plugin)
