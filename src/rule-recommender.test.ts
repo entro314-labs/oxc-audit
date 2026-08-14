@@ -194,6 +194,27 @@ describe('audit plugin prerequisites', () => {
     expect(prerequisite?.install).toBe('pnpm add -D oxlint-audit-plugins')
   })
 
+  it('needs no separate runtime when the package is installed', () => {
+    // `oxlint-audit-plugins` declares `@oxlint/plugins` as a dependency, so installing it
+    // brings the runtime; requiring a second install would withhold rules that already work.
+    expect(jsPluginTargets(stackOf(['audit-plugins', 'zod']))).toContain('data-layer')
+    expect(
+      findPrerequisites(stackOf(['audit-plugins', 'zod'])).some(({ capability }) =>
+        capability.startsWith('Stack-specific'),
+      ),
+    ).toBe(false)
+  })
+
+  it('does need the runtime when the sources are only a copy in the tree', () => {
+    // A copied directory carries no manifest, so nothing guarantees the runtime is there.
+    const vendored = stackOf([['audit-plugins', 'config-file'], 'zod'])
+
+    expect(jsPluginTargets(vendored)).toEqual([])
+    expect(
+      jsPluginTargets(stackOf([['audit-plugins', 'config-file'], 'oxlint-plugins', 'zod'])),
+    ).toContain('data-layer')
+  })
+
   it('asks for the runtime once the sources are present some other way', () => {
     const prerequisite = findPrerequisites(stackOf([['audit-plugins', 'config-file'], 'zod'])).find(
       ({ capability }) => capability.startsWith('Stack-specific audit rules'),
