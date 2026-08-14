@@ -1,6 +1,6 @@
 {
   "name": "oxc-audit",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Deterministically audit a project's stack and configure the Oxc toolchain around it - oxlint, tsgolint and oxfmt",
   "keywords": [
     "audit",

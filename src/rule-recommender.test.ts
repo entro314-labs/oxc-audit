@@ -88,12 +88,13 @@ describe('audit plugin recommendations', () => {
     expect(targets).not.toContain('slop-stop/require-safety-comment-for-type-assertion')
   })
 
-  it('points at node_modules when the package is a dependency', () => {
+  it('names the package when it is a dependency', () => {
     const entry = recommendForStack(stackOf(['audit-plugins', 'oxlint-plugins', 'zod'])).find(
       ({ kind }) => kind === 'js-plugin',
     )
 
-    expect(entry?.specifier).toBe('./node_modules/oxlint-plugin-audit/src/data-layer/index.ts')
+    // A bare specifier, resolved through the package's `exports` map.
+    expect(entry?.specifier).toBe('oxlint-plugin-audit/data-layer')
   })
 
   it('points at the vendored copy when the plugins were copied into the tree', () => {
