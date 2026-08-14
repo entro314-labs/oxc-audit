@@ -7,7 +7,7 @@ Two things that ship separately and are installed separately.
 **`oxc-audit`** - the CLI, in [src/](src/) and [bin/](bin/). It reads a project's stack off disk
 and configures the Oxc toolchain around it. Published to npm.
 
-**`oxlint-plugin-audit`** - seven custom Oxlint plugins, in [plugins/](plugins/). Loaded through
+**`oxlint-audit-plugins`** - seven custom Oxlint plugins, in [plugins/](plugins/). Loaded through
 `jsPlugins`. Currently `private`, distributed by copying via its install skill.
 
 The CLI covers the whole Oxc toolchain, not just the linter: `oxlint` rules, the type-aware
@@ -61,12 +61,16 @@ never recommended without the plugin that provides it - a `react/*` rule in a co
 `react` plugin is dead config. Both are asserted in `rule-recommender.test.ts`. The same applies
 to `plugins/oxlintrc.audit.json`, which enables the built-in plugins beside the custom ones.
 
-**Never write foreign source into a consuming project.** Oxlint loads js plugins by path,
-which makes copying `plugins/src` into a project look like the obvious way to ship them. It is
-not: a default `tsconfig.json` has no `include`, so everything under the project root joins its
-compilation, and the plugin sources' `.ts` import specifiers require `allowImportingTsExtensions`.
-Vendoring them produced 342 type errors in a trivial project and a multi-gigabyte `tsc`. The
-package has to be published so it resolves from `node_modules`, which `tsc` excludes by default.
+**`plugins/` ships compiled JavaScript, never its sources.** Node refuses to strip types from
+anything under `node_modules` (`ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`), so a package of
+`.ts` files fails to load for every consumer. `pnpm build` bundles each entry — bundling, not
+transpiling, because the sources import each other with explicit `.ts` extensions. `exports`
+points at `dist/`, and `prepublishOnly` runs the build.
+
+Copying the sources into a consuming project is the other wrong answer: a default
+`tsconfig.json` has no `include`, so everything under the project root joins its compilation,
+and those `.ts` import specifiers then need `allowImportingTsExtensions`. That produced 342
+type errors in a trivial project and a multi-gigabyte `tsc`.
 
 **Never configure tooling that is not installed.** Type-aware rules are gated on `oxlint-tsgolint`
 being present; `jsPlugins` entries are gated on the plugin package being present. Writing either

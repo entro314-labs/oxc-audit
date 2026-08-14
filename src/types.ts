@@ -154,7 +154,7 @@ export type StackSignalId =
   | 'jsdoc'
   | 'esm'
   | 'monorepo'
-  // Stacks the oxlint-plugin-audit plugins cover. Detected separately from the plugins
+  // Stacks the oxlint-audit-plugins plugins cover. Detected separately from the plugins
   // themselves so the tool can say which plugins would apply before any are installed.
   | 'zod'
   | 'tanstack-query'
