@@ -12,7 +12,7 @@ starting point, or on one that already has a config to see what the stack has ou
 npx oxc-audit                      # report only
 npx oxc-audit --write              # apply the recommendations
 npx oxc-audit --strict --security  # ask for more
-npx oxc-audit --write --install-plugins  # add the custom plugins too
+npx oxc-audit --strict --write     # apply a stricter set
 ```
 
 Four tools, one pass:
@@ -37,17 +37,16 @@ manager, never installed — the lockfile is the project's to change.
 
 ## The custom plugins
 
-`oxlint-plugin-audit` is not on npm. It ships inside `oxc-audit` and is copied into the
-project, because Oxlint loads js plugins by path:
+`oxlint-plugin-audit` lives in [plugins/](plugins/) in this repository and is **not published
+yet**, so the audit reports the plugins its rules would apply to and stops there.
 
-```bash
-oxc-audit --write --install-plugins   # copies them to tools/oxlint/audit-plugins/
-pnpm add -D @oxlint/plugins           # the runtime every plugin imports
-```
-
-The copy is never overwritten once it exists: vendored sources are code the project now owns
-and may have edited. The directory is added to `ignorePatterns`, since linting tooling the
-project did not write reports findings against code it does not maintain.
+It is deliberately not copied into your project. Oxlint loads js plugins by filesystem path,
+which makes vendoring the sources tempting, but a `tsconfig.json` with no `include` compiles
+everything under the project root — so the copied plugin sources join your compilation, and
+their `.ts` import specifiers need `allowImportingTsExtensions`, which your project has no
+reason to set. The result is hundreds of type errors in code you did not write, and a
+type-checker loading Oxlint's generated AST unions across every rule file. Publishing the
+package puts it in `node_modules`, which `tsc` excludes by default, and is the correct fix.
 
 ## What it does
 

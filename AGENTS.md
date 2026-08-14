@@ -61,6 +61,13 @@ never recommended without the plugin that provides it - a `react/*` rule in a co
 `react` plugin is dead config. Both are asserted in `rule-recommender.test.ts`. The same applies
 to `plugins/oxlintrc.audit.json`, which enables the built-in plugins beside the custom ones.
 
+**Never write foreign source into a consuming project.** Oxlint loads js plugins by path,
+which makes copying `plugins/src` into a project look like the obvious way to ship them. It is
+not: a default `tsconfig.json` has no `include`, so everything under the project root joins its
+compilation, and the plugin sources' `.ts` import specifiers require `allowImportingTsExtensions`.
+Vendoring them produced 342 type errors in a trivial project and a multi-gigabyte `tsc`. The
+package has to be published so it resolves from `node_modules`, which `tsc` excludes by default.
+
 **Never configure tooling that is not installed.** Type-aware rules are gated on `oxlint-tsgolint`
 being present; `jsPlugins` entries are gated on the plugin package being present. Writing either
 without its dependency produces a config Oxlint refuses to start on. When the capability is

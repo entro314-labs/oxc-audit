@@ -190,10 +190,10 @@ describe('audit plugin prerequisites', () => {
 
     expect(prerequisite?.capability).toContain('data-layer')
     expect(prerequisite?.capability).toContain('ai-integrations')
-    expect(prerequisite?.install).toBe('oxc-audit --write --install-plugins')
+    expect(prerequisite?.install).toBe('(not published yet - nothing to install)')
   })
 
-  it('asks for the runtime, not the sources, once the sources are already vendored', () => {
+  it('asks for the runtime once the sources are present some other way', () => {
     const prerequisite = findPrerequisites(stackOf([['audit-plugins', 'config-file'], 'zod'])).find(
       ({ capability }) => capability.startsWith('Stack-specific audit rules'),
     )
