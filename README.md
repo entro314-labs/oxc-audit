@@ -37,21 +37,35 @@ manager, never installed — the lockfile is the project's to change.
 
 ## The custom plugins
 
-`oxlint-plugin-audit` lives in [plugins/](plugins/) in this repository and is **not published
-yet**, so the audit reports the plugins its rules would apply to and stops there. Oxlint's own
-docs describe two ways to load a js plugin — an npm specifier or a local path — and publishing
-is the one that does not put foreign source in your tree.
+`oxlint-plugin-audit` lives in [plugins/](plugins/) and is **not published yet**, so the audit
+reports which of its plugins your stack would justify and stops there.
 
-Worth knowing before you rely on them: Oxlint states that **js plugins are in alpha and not
-subject to semver**, so the plugin API can change between minor releases.
+Publishing is the fix, and the package is already shaped for it: one subpath export per
+plugin, and `@oxlint/plugins` as a real dependency so installing it brings the runtime too.
+Once published, a project needs one install and the config names the package rather than a
+path into it:
 
-It is deliberately not copied into your project. Oxlint loads js plugins by filesystem path,
-which makes vendoring the sources tempting, but a `tsconfig.json` with no `include` compiles
-everything under the project root — so the copied plugin sources join your compilation, and
-their `.ts` import specifiers need `allowImportingTsExtensions`, which your project has no
-reason to set. The result is hundreds of type errors in code you did not write, and a
-type-checker loading Oxlint's generated AST unions across every rule file. Publishing the
-package puts it in `node_modules`, which `tsc` excludes by default, and is the correct fix.
+```jsonc
+{
+  "jsPlugins": ["oxlint-plugin-audit/data-layer"],
+  "rules": { "data-layer/no-zod-trim-after-min-length": "error" }
+}
+```
+
+Oxlint resolves that through the package's `exports` map, which keeps working when the
+package reorganises its files and under package managers that do not hoist into a flat
+`node_modules`.
+
+The sources are deliberately never copied into your project. Oxlint loads js plugins by path
+as well as by name, which makes vendoring look reasonable, but a `tsconfig.json` with no
+`include` compiles everything under the project root — so the copied sources join your
+compilation, and their `.ts` import specifiers need `allowImportingTsExtensions`, which your
+project has no reason to set. Hundreds of type errors in code you did not write, and a
+type-checker loading Oxlint's generated AST unions across every rule file. `node_modules` is
+excluded from all of that by default.
+
+Worth knowing before you rely on these rules: Oxlint states that **js plugins are in alpha
+and not subject to semver**, so the plugin API can change between minor releases.
 
 ## What it does
 

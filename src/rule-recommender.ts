@@ -1016,11 +1016,17 @@ const AUDIT_PLUGINS: Array<{
  * A vendored copy and an installed dependency need different `jsPlugins` paths, and
  * guessing wrong produces a config Oxlint cannot load.
  */
-function auditPluginSpecifierBase(stack: ProjectStack): string {
+function auditPluginSpecifier(stack: ProjectStack, plugin: string): string {
   const signal = stack.signals.find(({ id }) => id === 'audit-plugins')
   const vendored = signal?.evidence.some(({ kind }) => kind === 'config-file') ?? false
 
-  return vendored ? './tools/oxlint/audit-plugins' : './node_modules/oxlint-plugin-audit/src'
+  // A dependency is named, not pathed. Oxlint resolves a bare specifier through the
+  // package's `exports` map, which is what keeps the config working when the package
+  // reorganises its files and under package managers that do not hoist into a flat
+  // `node_modules`. Reaching into `node_modules/.../src` would bypass both.
+  return vendored
+    ? `./tools/oxlint/audit-plugins/${plugin}/index.ts`
+    : `oxlint-plugin-audit/${plugin}`
 }
 
 /**
@@ -1123,8 +1129,6 @@ export function recommendForStack(
   // `jsPlugins` entry without `@oxlint/plugins` installed makes Oxlint fail to start, which
   // would leave the project worse off than having no custom rules at all.
   if (hasSignal(stack, 'audit-plugins') && hasSignal(stack, 'oxlint-plugins')) {
-    const base = auditPluginSpecifierBase(stack)
-
     for (const { plugin, requires, reason, rules, domains: pluginDomains } of AUDIT_PLUGINS) {
       const triggeredBy = requires.filter((signal) => hasSignal(stack, signal))
 
@@ -1145,7 +1149,7 @@ export function recommendForStack(
       recommendations.push({
         kind: 'js-plugin',
         target: plugin,
-        specifier: `${base}/${plugin}/index.ts`,
+        specifier: auditPluginSpecifier(stack, plugin),
         reason,
         triggeredBy,
       })
