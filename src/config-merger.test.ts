@@ -15,7 +15,65 @@ function category(target: string, severity: 'off' | 'warn' | 'error'): Recommend
   return { kind: 'category', target, severity, reason: 'test', triggeredBy: [] }
 }
 
-describe('mergeRecommendations — never weakens', () => {
+function jsPlugin(target: string, specifier?: string): Recommendation {
+  return { kind: 'js-plugin', target, specifier, reason: 'test', triggeredBy: [] }
+}
+
+describe('mergeRecommendations - js plugins', () => {
+  it('adds a jsPlugins entry with the name and specifier', () => {
+    const { config, applied } = mergeRecommendations({}, [
+      jsPlugin('data-layer', './node_modules/oxlint-plugin-audit/src/data-layer/index.ts'),
+    ])
+
+    expect(config.jsPlugins).toEqual([
+      {
+        name: 'data-layer',
+        specifier: './node_modules/oxlint-plugin-audit/src/data-layer/index.ts',
+      },
+    ])
+    expect(applied).toHaveLength(1)
+  })
+
+  it('keeps existing entries when adding one', () => {
+    const { config } = mergeRecommendations({ jsPlugins: ['./local/plugin.ts'] }, [
+      jsPlugin('slop-stop', './node_modules/oxlint-plugin-audit/src/slop-stop/index.ts'),
+    ])
+
+    expect(config.jsPlugins).toHaveLength(2)
+    expect(config.jsPlugins?.[0]).toBe('./local/plugin.ts')
+  })
+
+  it('does not re-add a plugin already registered in object form', () => {
+    const { config, applied, alreadySatisfied } = mergeRecommendations(
+      { jsPlugins: [{ name: 'data-layer', specifier: './tools/oxlint/data-layer/index.ts' }] },
+      [jsPlugin('data-layer', './node_modules/oxlint-plugin-audit/src/data-layer/index.ts')],
+    )
+
+    // The project's own path wins; a second entry for the same plugin would be a conflict.
+    expect(config.jsPlugins).toHaveLength(1)
+    expect(applied).toEqual([])
+    expect(alreadySatisfied).toHaveLength(1)
+  })
+
+  it('recognises a plugin already registered in bare-string form', () => {
+    const { config, alreadySatisfied } = mergeRecommendations(
+      { jsPlugins: ['./tools/oxlint/audit-plugins/next-react/index.ts'] },
+      [jsPlugin('next-react', './node_modules/oxlint-plugin-audit/src/next-react/index.ts')],
+    )
+
+    expect(config.jsPlugins).toHaveLength(1)
+    expect(alreadySatisfied).toHaveLength(1)
+  })
+
+  it('writes nothing when no specifier is supplied', () => {
+    const { config, applied } = mergeRecommendations({}, [jsPlugin('data-layer')])
+
+    expect(config.jsPlugins).toBeUndefined()
+    expect(applied).toEqual([])
+  })
+})
+
+describe('mergeRecommendations - never weakens', () => {
   it('leaves a stricter existing rule severity alone', () => {
     const { config, applied, alreadySatisfied } = mergeRecommendations(
       { rules: { 'no-eval': 'error' } },
@@ -87,7 +145,7 @@ describe('mergeRecommendations — never weakens', () => {
   })
 })
 
-describe('mergeRecommendations — plugin handling', () => {
+describe('mergeRecommendations - plugin handling', () => {
   it('carries the base plugin set when first writing the field', () => {
     // Oxlint's schema: "Setting the `plugins` field will overwrite the base set."
     const { config } = mergeRecommendations({}, [plugin('react')])
@@ -118,7 +176,7 @@ describe('mergeRecommendations — plugin handling', () => {
   })
 })
 
-describe('mergeRecommendations — the additive invariant holds for any input', () => {
+describe('mergeRecommendations - the additive invariant holds for any input', () => {
   const existingConfigs: OxlintConfig[] = [
     {},
     { rules: {} },

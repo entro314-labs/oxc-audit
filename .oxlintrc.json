@@ -1,6 +1,13 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
 
+  "ignorePatterns": [
+    // Deliberately broken code, kept so the plugin package can prove its rules still fire.
+    "plugins/fixtures",
+    // Generated copies of plugins/src; `pnpm --filter ... check:skill-assets` keeps them in sync.
+    "plugins/skills/*/assets"
+  ],
+
   "plugins": [
     "oxc",
     "typescript",

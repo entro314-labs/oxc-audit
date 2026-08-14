@@ -158,7 +158,7 @@ describe('detectStack', () => {
   })
 })
 
-describe('detectStack — workspace roots', () => {
+describe('detectStack - workspace roots', () => {
   it('detects a pnpm workspace, which declares itself outside package.json', async () => {
     const dir = await setupProject({
       'package.json': JSON.stringify({ name: 'root' }),

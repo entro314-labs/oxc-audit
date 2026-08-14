@@ -16,8 +16,8 @@ export interface WorkspaceDeclaration {
  * Reads a workspace's declared package globs.
  *
  * Honouring the declaration matters because exclusions are deliberate. A repo can carry a
- * package it keeps out of the workspace on purpose — a React Native app that must own its
- * own dependency graph, say — and writing config into it is exactly the unrequested change
+ * package it keeps out of the workspace on purpose - a React Native app that must own its
+ * own dependency graph, say - and writing config into it is exactly the unrequested change
  * this tool avoids elsewhere.
  *
  * Returns `undefined` when no declaration exists, leaving the caller to fall back to

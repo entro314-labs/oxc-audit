@@ -2,6 +2,7 @@ import type {
   OxlintBuiltinPlugin,
   OxlintCategory,
   OxlintConfig,
+  OxlintJsPlugin,
   OxlintRuleSeverity,
   OxlintSeverity,
   Recommendation,
@@ -77,6 +78,10 @@ function applyRecommendation(config: OxlintConfig, recommendation: Recommendatio
     return applyPlugin(config, recommendation.target as OxlintBuiltinPlugin)
   }
 
+  if (recommendation.kind === 'js-plugin') {
+    return applyJsPlugin(config, recommendation.target, recommendation.specifier)
+  }
+
   if (recommendation.kind === 'option') {
     return applyOption(config, recommendation.target)
   }
@@ -102,6 +107,42 @@ function applyPlugin(config: OxlintConfig, plugin: OxlintBuiltinPlugin): ApplyOu
 
   // Carry the base set so writing the field does not disable what was implicitly on.
   config.plugins = [...new Set([...OXLINT_DEFAULT_PLUGINS, ...enabledPlugins, plugin])].sort()
+
+  return 'applied'
+}
+
+/** The plugin name an existing `jsPlugins` entry registers, in either of its two forms. */
+function jsPluginName(entry: OxlintJsPlugin): string {
+  if (typeof entry !== 'string') {
+    return entry.name
+  }
+
+  // The bare-string form takes its name from the plugin's own `meta.name`, which is not
+  // readable from here. The last path segment before `/index.ts` is the directory the
+  // plugin ships in, which is how this tool writes them and how the package lays them out.
+  const segments = entry.replace(/\/index\.[cm]?[jt]s$/u, '').split('/')
+
+  return segments.at(-1) ?? entry
+}
+
+function applyJsPlugin(
+  config: OxlintConfig,
+  plugin: string,
+  specifier: string | undefined,
+): ApplyOutcome {
+  // Without a path there is nothing loadable to write; treated as satisfied so a caller
+  // that omits it cannot produce a config Oxlint refuses to start on.
+  if (specifier === undefined) {
+    return 'satisfied'
+  }
+
+  const existing = config.jsPlugins ?? []
+
+  if (existing.some((entry) => jsPluginName(entry) === plugin)) {
+    return 'satisfied'
+  }
+
+  config.jsPlugins = [...existing, { name: plugin, specifier }]
 
   return 'applied'
 }

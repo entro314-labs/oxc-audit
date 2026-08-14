@@ -44,7 +44,7 @@ export interface WorkspaceDiscovery {
  *
  * Discovery walks for `package.json`, which works regardless of which workspace
  * convention a repo uses. When the repo *declares* its packages, that declaration then
- * filters the result — including its exclusions.
+ * filters the result - including its exclusions.
  *
  * Honouring exclusions is the point. A repo can keep a package out of its workspace
  * deliberately (a React Native app that must own its own dependency graph, for instance,

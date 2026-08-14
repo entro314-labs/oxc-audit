@@ -25,6 +25,9 @@
     "coverage",
     "pnpm-lock.yaml",
     "package-lock.json",
+    // The plugin package follows the Oxlint plugin ecosystem's style (tabs, semicolons,
+    // double quotes), not the CLI's. It runs its own lint and typecheck via `pnpm check`.
+    "plugins",
   ],
 
   "sortImports": {
