@@ -1,4 +1,4 @@
-# oxlint-plugin-audit
+# oxlint-audit-plugins
 
 Oxlint rules extracted from the version-locked stack audit prompts in
 `prompts/prompts/audit/`. Each prompt is a checklist an AI runs against a codebase; the
@@ -35,8 +35,8 @@ the residue a partly-applied codemod leaves behind.
 // .oxlintrc.json
 {
   "jsPlugins": [
-    "./node_modules/oxlint-plugin-audit/src/data-layer/index.ts",
-    "./node_modules/oxlint-plugin-audit/src/next-react/index.ts"
+    "./node_modules/oxlint-audit-plugins/src/data-layer/index.ts",
+    "./node_modules/oxlint-audit-plugins/src/next-react/index.ts"
   ],
   "rules": {
     "data-layer/no-zod-string-format-methods": "warn",
@@ -49,9 +49,9 @@ A ready-made preset with every rule plus the built-in and type-aware rules that 
 of the audit checklists ships as `oxlintrc.audit.json`:
 
 ```bash
-oxlint -c node_modules/oxlint-plugin-audit/oxlintrc.audit.json .
-oxlint -c node_modules/oxlint-plugin-audit/oxlintrc.audit.json --type-aware .   # needs a tsconfig
-oxlint -c node_modules/oxlint-plugin-audit/oxlintrc.audit.json --fix .
+oxlint -c node_modules/oxlint-audit-plugins/oxlintrc.audit.json .
+oxlint -c node_modules/oxlint-audit-plugins/oxlintrc.audit.json --type-aware .   # needs a tsconfig
+oxlint -c node_modules/oxlint-audit-plugins/oxlintrc.audit.json --fix .
 ```
 
 `jsPlugins` paths in the preset are relative to the preset file, so it works in place. Copy it

@@ -1,6 +1,6 @@
 ---
 name: install-audit-plugins
-description: Install and configure the oxlint-plugin-audit plugins (next-react, data-layer, ai-integrations, ts-tooling, slop-stop) in a local TypeScript or JavaScript repository. Use whenever a user asks to add the audit lint rules, copy the audit plugins, catch deprecated framework APIs or migration residue with Oxlint, or configure the shipped audit preset.
+description: Install and configure the oxlint-audit-plugins plugins (next-react, data-layer, ai-integrations, ts-tooling, slop-stop) in a local TypeScript or JavaScript repository. Use whenever a user asks to add the audit lint rules, copy the audit plugins, catch deprecated framework APIs or migration residue with Oxlint, or configure the shipped audit preset.
 ---
 
 # Install the audit plugins

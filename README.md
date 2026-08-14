@@ -17,12 +17,12 @@ npx oxc-audit --strict --write     # apply a stricter set
 
 Four tools, one pass:
 
-| Tool                  | What it gets                                                    | Written to       |
-| --------------------- | --------------------------------------------------------------- | ---------------- |
-| `oxlint`              | Plugins, categories and targeted rules for the detected stack   | `.oxlintrc.json` |
-| `oxlint-tsgolint`     | Type-aware rules, scaled by level, when the engine is installed | `.oxlintrc.json` |
-| `oxlint-plugin-audit` | Custom plugins for the frameworks and libraries in use          | `.oxlintrc.json` |
-| `oxfmt`               | Formatter settings, carried over from Prettier or Biome         | `.oxfmtrc.jsonc` |
+| Tool                   | What it gets                                                    | Written to       |
+| ---------------------- | --------------------------------------------------------------- | ---------------- |
+| `oxlint`               | Plugins, categories and targeted rules for the detected stack   | `.oxlintrc.json` |
+| `oxlint-tsgolint`      | Type-aware rules, scaled by level, when the engine is installed | `.oxlintrc.json` |
+| `oxlint-audit-plugins` | Custom plugins for the frameworks and libraries in use          | `.oxlintrc.json` |
+| `oxfmt`                | Formatter settings, carried over from Prettier or Biome         | `.oxfmtrc.jsonc` |
 
 Nothing is written for a tool that is not installed. Where a capability is wanted but its
 engine is missing, it is reported as a prerequisite rather than configured, because a config
@@ -37,35 +37,30 @@ manager, never installed — the lockfile is the project's to change.
 
 ## The custom plugins
 
-`oxlint-plugin-audit` lives in [plugins/](plugins/) and is **not published yet**, so the audit
-reports which of its plugins your stack would justify and stops there.
+`oxlint-audit-plugins` on npm, built from [plugins/](plugins/). One install, and the runtime
+every plugin imports arrives with it as a dependency:
 
-Publishing is the fix, and the package is already shaped for it: one subpath export per
-plugin, and `@oxlint/plugins` as a real dependency so installing it brings the runtime too.
-Once published, a project needs one install and the config names the package rather than a
-path into it:
+```bash
+pnpm add -D oxlint-audit-plugins
+```
 
 ```jsonc
 {
-  "jsPlugins": ["oxlint-plugin-audit/data-layer"],
+  "jsPlugins": ["oxlint-audit-plugins/data-layer"],
   "rules": { "data-layer/no-zod-trim-after-min-length": "error" }
 }
 ```
 
-Oxlint resolves that through the package's `exports` map, which keeps working when the
+Oxlint resolves that through the package's `exports` map, so the config keeps working when the
 package reorganises its files and under package managers that do not hoist into a flat
 `node_modules`.
 
-The sources are deliberately never copied into your project. Oxlint loads js plugins by path
-as well as by name, which makes vendoring look reasonable, but a `tsconfig.json` with no
-`include` compiles everything under the project root — so the copied sources join your
-compilation, and their `.ts` import specifiers need `allowImportingTsExtensions`, which your
-project has no reason to set. Hundreds of type errors in code you did not write, and a
-type-checker loading Oxlint's generated AST unions across every rule file. `node_modules` is
-excluded from all of that by default.
+The package ships compiled JavaScript rather than its TypeScript sources. Node refuses to
+strip types from anything under `node_modules` — `ERR_UNSUPPORTED_NODE_MODULES_TYPE_STRIPPING`
+— so a package of `.ts` files cannot be loaded by any consumer, however new their Node is.
 
-Worth knowing before you rely on these rules: Oxlint states that **js plugins are in alpha
-and not subject to semver**, so the plugin API can change between minor releases.
+Worth knowing before you rely on these rules: Oxlint states that **js plugins are in alpha and
+not subject to semver**, so the plugin API can change between minor releases.
 
 ## What it does
 

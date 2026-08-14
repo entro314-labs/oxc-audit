@@ -94,7 +94,7 @@ describe('audit plugin recommendations', () => {
     )
 
     // A bare specifier, resolved through the package's `exports` map.
-    expect(entry?.specifier).toBe('oxlint-plugin-audit/data-layer')
+    expect(entry?.specifier).toBe('oxlint-audit-plugins/data-layer')
   })
 
   it('points at the vendored copy when the plugins were copied into the tree', () => {
@@ -191,7 +191,7 @@ describe('audit plugin prerequisites', () => {
 
     expect(prerequisite?.capability).toContain('data-layer')
     expect(prerequisite?.capability).toContain('ai-integrations')
-    expect(prerequisite?.install).toBe('(not published yet - nothing to install)')
+    expect(prerequisite?.install).toBe('pnpm add -D oxlint-audit-plugins')
   })
 
   it('asks for the runtime once the sources are present some other way', () => {

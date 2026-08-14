@@ -22,13 +22,13 @@ function jsPlugin(target: string, specifier?: string): Recommendation {
 describe('mergeRecommendations - js plugins', () => {
   it('adds a jsPlugins entry with the name and specifier', () => {
     const { config, applied } = mergeRecommendations({}, [
-      jsPlugin('data-layer', './node_modules/oxlint-plugin-audit/src/data-layer/index.ts'),
+      jsPlugin('data-layer', './node_modules/oxlint-audit-plugins/src/data-layer/index.ts'),
     ])
 
     expect(config.jsPlugins).toEqual([
       {
         name: 'data-layer',
-        specifier: './node_modules/oxlint-plugin-audit/src/data-layer/index.ts',
+        specifier: './node_modules/oxlint-audit-plugins/src/data-layer/index.ts',
       },
     ])
     expect(applied).toHaveLength(1)
@@ -36,7 +36,7 @@ describe('mergeRecommendations - js plugins', () => {
 
   it('keeps existing entries when adding one', () => {
     const { config } = mergeRecommendations({ jsPlugins: ['./local/plugin.ts'] }, [
-      jsPlugin('slop-stop', './node_modules/oxlint-plugin-audit/src/slop-stop/index.ts'),
+      jsPlugin('slop-stop', './node_modules/oxlint-audit-plugins/src/slop-stop/index.ts'),
     ])
 
     expect(config.jsPlugins).toHaveLength(2)
@@ -46,7 +46,7 @@ describe('mergeRecommendations - js plugins', () => {
   it('does not re-add a plugin already registered in object form', () => {
     const { config, applied, alreadySatisfied } = mergeRecommendations(
       { jsPlugins: [{ name: 'data-layer', specifier: './tools/oxlint/data-layer/index.ts' }] },
-      [jsPlugin('data-layer', './node_modules/oxlint-plugin-audit/src/data-layer/index.ts')],
+      [jsPlugin('data-layer', './node_modules/oxlint-audit-plugins/src/data-layer/index.ts')],
     )
 
     // The project's own path wins; a second entry for the same plugin would be a conflict.
@@ -58,7 +58,7 @@ describe('mergeRecommendations - js plugins', () => {
   it('recognises a plugin already registered in bare-string form', () => {
     const { config, alreadySatisfied } = mergeRecommendations(
       { jsPlugins: ['./tools/oxlint/audit-plugins/next-react/index.ts'] },
-      [jsPlugin('next-react', './node_modules/oxlint-plugin-audit/src/next-react/index.ts')],
+      [jsPlugin('next-react', './node_modules/oxlint-audit-plugins/src/next-react/index.ts')],
     )
 
     expect(config.jsPlugins).toHaveLength(1)
