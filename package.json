@@ -1,6 +1,6 @@
 {
-  "name": "oxc-audit",
-  "version": "1.2.0",
+  "name": "@entro314-labs/oxc-audit",
+  "version": "1.3.0",
   "description": "Deterministically audit a project's stack and configure the Oxc toolchain around it - oxlint, tsgolint and oxfmt",
   "keywords": [
     "audit",
@@ -65,12 +65,12 @@
     "oxlint-tsgolint": "^7.0.2001",
     "publint": "^0.3.23",
     "tsdown": "^0.22.14",
-    "typescript": "^7.0.2",
+    "typescript": "next",
     "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=24.19.0",
-    "pnpm": ">=11.21.0"
+    "pnpm": ">=11.22.0"
   },
-  "packageManager": "pnpm@11.21.0"
+  "packageManager": "pnpm@11.22.0"
 }
