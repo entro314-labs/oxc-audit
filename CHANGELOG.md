@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-09-03
+
+### Fixed
+
+- The package build no longer fails on TypeScript 7.1. The declaration build now names the tsgo generator explicitly and resolves the compiler binary through TypeScript's own `getExePath`, instead of relying on a `7.0` version prefix and an undeclared `@typescript/native-preview` dependency. Type declarations ship again. ([b922a84](https://github.com/entro314-labs/oxc-audit/commit/b922a84))
+
 ## [1.3.1] - 2026-09-03
 
 ### Changed
@@ -77,6 +83,7 @@ Initial release.
   object forms), and `lerna.json` are read; with no declaration every package found on
   disk is audited as before.
 
-[Unreleased]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/entro314-labs/oxc-audit/compare/v1.0.0...v1.3.1
 [1.0.0]: https://github.com/entro314-labs/oxc-audit/releases/tag/v1.0.0
