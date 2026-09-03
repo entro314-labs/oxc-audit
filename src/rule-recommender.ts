@@ -38,6 +38,14 @@ const PLUGIN_RULES: Array<{
     reason: 'TypeScript is in use, so the typescript rules apply.',
   },
   {
+    // Oxlint 1.79 replaced the single `react/react-compiler` rule with 22 rules driven by the
+    // React Compiler's own validation passes, spread across the categories. Enabling this
+    // plugin is all it takes: 12 of them sit in `correctness`, so every level gets them, and
+    // four more arrive with `suspicious` at `recommended`. None is named individually below.
+    // Promoting the `suspicious` ones would only double-report - `exhaustive-effect-dependencies`
+    // and `memo-dependencies` cover the ground `react/exhaustive-deps` already covers from
+    // `correctness`, and `react/hooks` covers `react/rules-of-hooks`. Silencing either side
+    // would mean writing an `off`, which this tool does not do.
     plugin: 'react',
     requires: ['react', 'nextjs'],
     reason: 'React is a dependency, so the react rules apply.',

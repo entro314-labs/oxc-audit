@@ -29,11 +29,11 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@oxlint/plugins": "^1.78.0"
+		"@oxlint/plugins": "^1.81.0"
 	},
 	"devDependencies": {
 		"@types/node": "^26.2.0",
-		"oxlint": "^1.78.0",
+		"oxlint": "^1.81.0",
 		"oxlint-tsgolint": "^7.0.2001",
 		"tsdown": "^0.22.14",
 		"tsx": "^4.23.12",
