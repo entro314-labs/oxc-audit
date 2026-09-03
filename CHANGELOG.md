@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-09-03
+
+### Fixed
+- Both packages are now published under the `@entro314labs` npm scope, so installs resolve the correct scoped package names ([1d4fe6b](https://github.com/entro314-labs/oxc-audit/commit/1d4fe6b))
+
 ## [1.3.2] - 2026-09-03
 
 ### Changed
@@ -92,7 +97,8 @@ Initial release.
   object forms), and `lerna.json` are read; with no declaration every package found on
   disk is audited as before.
 
-[Unreleased]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.2...HEAD
+[Unreleased]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.3...HEAD
+[1.3.3]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/entro314-labs/oxc-audit/compare/v1.0.0...v1.3.1
 [1.0.0]: https://github.com/entro314-labs/oxc-audit/releases/tag/v1.0.0
