@@ -152,7 +152,9 @@ function buildCommand(
   const command = new Command()
 
   command
-    .name(metadata.name)
+    // The npm name is scoped; the installed binary is not. Help output names what the
+    // user actually types, so the scope is dropped.
+    .name(metadata.name.split('/').at(-1) ?? metadata.name)
     .description(metadata.description)
     .version(metadata.version)
     .helpOption('-h, --help', 'display help for command')

@@ -7,7 +7,7 @@ Two things that ship separately and are installed separately.
 **`oxc-audit`** - the CLI, in [src/](src/) and [bin/](bin/). It reads a project's stack off disk
 and configures the Oxc toolchain around it. Published to npm.
 
-**`oxlint-audit-plugins`** - seven custom Oxlint plugins, in [plugins/](plugins/). Loaded through
+**`@entro314labs/oxlint-audit-plugins`** - seven custom Oxlint plugins, in [plugins/](plugins/). Loaded through
 `jsPlugins`. Currently `private`, distributed by copying via its install skill.
 
 The CLI covers the whole Oxc toolchain, not just the linter: `oxlint` rules, the type-aware

@@ -94,7 +94,7 @@ describe('audit plugin recommendations', () => {
     )
 
     // A bare specifier, resolved through the package's `exports` map.
-    expect(entry?.specifier).toBe('oxlint-audit-plugins/data-layer')
+    expect(entry?.specifier).toBe('@entro314labs/oxlint-audit-plugins/data-layer')
   })
 
   it('points at the vendored copy when the plugins were copied into the tree', () => {
@@ -191,11 +191,11 @@ describe('audit plugin prerequisites', () => {
 
     expect(prerequisite?.capability).toContain('data-layer')
     expect(prerequisite?.capability).toContain('ai-integrations')
-    expect(prerequisite?.install).toBe('pnpm add -D oxlint-audit-plugins')
+    expect(prerequisite?.install).toBe('pnpm add -D @entro314labs/oxlint-audit-plugins')
   })
 
   it('needs no separate runtime when the package is installed', () => {
-    // `oxlint-audit-plugins` declares `@oxlint/plugins` as a dependency, so installing it
+    // `@entro314labs/oxlint-audit-plugins` declares `@oxlint/plugins` as a dependency, so installing it
     // brings the runtime; requiring a second install would withhold rules that already work.
     expect(jsPluginTargets(stackOf(['audit-plugins', 'zod']))).toContain('data-layer')
     expect(

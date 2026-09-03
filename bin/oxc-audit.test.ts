@@ -5,7 +5,7 @@ import { pathToFileURL } from 'node:url'
 
 import { describe, expect, it } from 'vitest'
 
-import { isProcessEntrypoint } from './oxc-audit.js'
+import { isProcessEntrypoint, runCli } from './oxc-audit.js'
 
 /**
  * The entrypoint guard decides whether the CLI runs at all. When it is wrong the binary
@@ -64,5 +64,24 @@ describe('isProcessEntrypoint', () => {
     const { modulePath } = await setupEntrypoint()
 
     expect(await isProcessEntrypoint('[eval]', pathToFileURL(modulePath).href)).toBe(false)
+  })
+})
+
+describe('help output', () => {
+  it('names the binary rather than the scoped package', async () => {
+    // The name comes from `package.json`, which is scoped; the bin it installs is not.
+    // Printing the scope would tell the reader to type a command that does not exist.
+    let out = ''
+    const stdout = {
+      write: (chunk: string) => {
+        out += chunk
+        return true
+      },
+    }
+
+    await runCli(['--help'], { stdout, stderr: stdout })
+
+    expect(out).toContain('Usage: oxc-audit [options]')
+    expect(out).not.toContain('@entro314labs')
   })
 })

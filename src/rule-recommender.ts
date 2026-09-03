@@ -898,7 +898,7 @@ const TYPE_AWARE_RULES: Array<{
 ]
 
 /**
- * The js plugins shipped in `oxlint-audit-plugins`, and the stacks each one covers.
+ * The js plugins shipped in `@entro314labs/oxlint-audit-plugins`, and the stacks each one covers.
  *
  * These are custom plugins rather than built-ins, so they are loaded by path through
  * `jsPlugins`. Nothing here is recommended unless the package is actually present: a
@@ -1049,7 +1049,7 @@ function auditPluginSpecifier(stack: ProjectStack, plugin: string): string {
   // `node_modules`. Reaching into `node_modules/.../src` would bypass both.
   return vendored
     ? `./tools/oxlint/audit-plugins/${plugin}/index.ts`
-    : `oxlint-audit-plugins/${plugin}`
+    : `@entro314labs/oxlint-audit-plugins/${plugin}`
 }
 
 /**
@@ -1224,7 +1224,7 @@ export function findPrerequisites(stack: ProjectStack): Prerequisite[] {
         reason: `This project's dependencies match ${applicable.length} of the audit plugins, which catch deprecated APIs and migration residue that still type-checks and still runs.`,
         install: hasSignal(stack, 'audit-plugins')
           ? 'pnpm add -D @oxlint/plugins'
-          : 'pnpm add -D oxlint-audit-plugins',
+          : 'pnpm add -D @entro314labs/oxlint-audit-plugins',
       })
     }
   }
@@ -1263,7 +1263,7 @@ export function getRecommendablePlugins(): OxlintBuiltinPlugin[] {
  * Every js-plugin rule this recommender can emit, with its owning plugin.
  *
  * Deliberately separate from {@link getRecommendableRuleNames}: these rules come from
- * `oxlint-audit-plugins`, not from Oxlint, so they are absent from the built-in inventory
+ * `@entro314labs/oxlint-audit-plugins`, not from Oxlint, so they are absent from the built-in inventory
  * and are checked against the plugin package instead.
  */
 export function getAuditPluginRules(): Array<{ plugin: string; rules: string[] }> {

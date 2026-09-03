@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file.
 
 ## [1.3.2] - 2026-09-03
 
+### Changed
+
+- Both packages are now published under the `@entro314labs` npm scope: `oxc-audit` is
+  `@entro314labs/oxc-audit` and `oxlint-audit-plugins` is `@entro314labs/oxlint-audit-plugins`.
+  A generated `.oxlintrc.json` names the scoped specifier — `@entro314labs/oxlint-audit-plugins/data-layer`
+  — and the reported install command matches, so a project on the unscoped package keeps working
+  until it reinstalls under the new name, at which point the custom plugins are recommended again.
+  The installed binary is still `oxc-audit`.
+
 ### Fixed
 
 - The package build no longer fails on TypeScript 7.1. The declaration build now names the tsgo generator explicitly and resolves the compiler binary through TypeScript's own `getExePath`, instead of relying on a `7.0` version prefix and an undeclared `@typescript/native-preview` dependency. Type declarations ship again. ([b922a84](https://github.com/entro314-labs/oxc-audit/commit/b922a84))
