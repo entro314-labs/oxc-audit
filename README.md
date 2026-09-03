@@ -430,6 +430,10 @@ no longer exists.
 | `oxlint-vs-tsgolint.tsv` | Every `typescript/*` rule, and whether it needs type information | No type-aware rule is recommended outside the tsgolint gate, where it would be accepted and never fire |
 | `oxfmt-rules.tsv`        | The oxfmt configuration surface                                  | Reference only - this tool does not write formatter config                                             |
 
+All four are generated from the schemas the installed toolchain ships, never edited by hand.
+`pnpm docs:sync` rewrites them after a toolchain upgrade, and `pnpm docs:check` runs inside
+`pnpm check`, so an inventory that no longer matches the installed Oxlint fails the build.
+
 ### Releasing
 
 Bump the version in `package.json`, add the matching `## [x.y.z]` section to

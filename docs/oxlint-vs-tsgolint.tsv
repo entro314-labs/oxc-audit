@@ -14,8 +14,8 @@ typescript/consistent-type-definitions	no	n/a
 typescript/consistent-type-exports	yes	implemented
 typescript/consistent-type-imports	no	n/a
 typescript/dot-notation	yes	implemented
-typescript/explicit-member-accessibility	no	n/a
 typescript/explicit-function-return-type	no	n/a
+typescript/explicit-member-accessibility	no	n/a
 typescript/explicit-module-boundary-types	no	n/a
 typescript/method-signature-style	no	n/a
 typescript/no-array-delete	yes	implemented
