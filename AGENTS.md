@@ -49,12 +49,13 @@ next to the code it constrains.
 is checked against `docs/oxlint-rules.tsv`, `docs/tsgolint-rules.tsv`, and - for the js-plugin
 rules - each plugin's own `index.ts`, by [src/rule-inventory.test.ts](src/rule-inventory.test.ts).
 Renaming a rule in `plugins/` without updating the recommender fails the build. That is intended.
-Refresh `docs/oxlint-rules.tsv` after an Oxlint upgrade by running `oxlint --print-config` against
-a config that names every plugin in the schema's `LintPluginOptionsSchema` enum and sets all seven
-categories, then splitting each key on the first `/` into `rule<TAB>plugin` - bare keys are `eslint`,
-and the plugin segment needs its `_` turned back into `-` (`jsx_a11y`, `react_perf`). The suite only
-catches a rule that was renamed out from under the recommender; additions and unreferenced removals
-are invisible to it, so the file goes stale silently.
+That check only catches a rule renamed out from under the recommender, though - a rule Oxlint
+added, or one it removed that nothing references, is invisible to it. So the inventories are
+derived rather than hand-maintained:
+[scripts/sync-rule-inventories.ts](scripts/sync-rule-inventories.ts) rebuilds all four from the
+schemas in `node_modules`, `pnpm docs:sync` rewrites them, and `pnpm docs:check` inside
+`pnpm check` fails the build when they drift. After a toolchain upgrade, run `pnpm docs:sync` and
+review the diff; never edit a `docs/*.tsv` by hand.
 
 **The merger only ever adds.** [src/config-merger.ts](src/config-merger.ts) never removes a field,
 never lowers a severity, and treats an explicit `"off"` as a decision to report rather than
