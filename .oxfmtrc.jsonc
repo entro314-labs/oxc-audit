@@ -28,6 +28,9 @@
     // The plugin package follows the Oxlint plugin ecosystem's style (tabs, semicolons,
     // double quotes), not the CLI's. It runs its own lint and typecheck via `pnpm check`.
     "plugins",
+    // Prose is hand-written and hand-wrapped. Formatting it gains nothing, and it put
+    // `prepublishOnly` at the mercy of any stray Markdown sitting in the working tree.
+    "**/*.md",
   ],
 
   "sortImports": {
@@ -47,15 +50,4 @@
   },
 
   "sortPackageJson": true,
-
-  "overrides": [
-    {
-      // Markdown docs - don't reformat prose
-      "files": ["**/*.md"],
-      "options": {
-        "proseWrap": "preserve",
-        "printWidth": 120,
-      },
-    },
-  ],
 }
