@@ -1,7 +1,10 @@
 {
-	"name": "@entro314-labs/oxlint-audit-plugins",
+	"name": "@entro314labs/oxlint-audit-plugins",
 	"version": "1.3.1",
 	"private": false,
+	"publishConfig": {
+		"access": "public"
+	},
 	"description": "Oxlint rules extracted from the version-locked stack audit prompts: deprecated APIs, migration residue and security footguns across Next.js/React, the data layer, AI SDK/payment integrations and the JS toolchain.",
 	"type": "module",
 	"exports": {

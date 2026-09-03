@@ -23,7 +23,7 @@ not change anything else.
 2. Find the config to lint with, in this order:
    - the project's own Oxlint config, if it already registers the audit plugins;
    - otherwise `oxlintrc.audit.json` from the package, which enables every rule:
-     `oxlint -c node_modules/oxlint-audit-plugins/oxlintrc.audit.json .`
+     `oxlint -c node_modules/@entro314labs/oxlint-audit-plugins/oxlintrc.audit.json .`
 
    Add `--type-aware` when the project has a `tsconfig.json` and `oxlint-tsgolint` installed. The
    type-aware rules catch the swallowed errors and unsafe assertions the custom plugins cannot.

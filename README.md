@@ -9,25 +9,25 @@ what to add, or adds it for you. Run it on a project with no Oxc config to get a
 starting point, or on one that already has a config to see what the stack has outgrown.
 
 ```bash
-npx oxc-audit                      # report only
-npx oxc-audit --write              # apply the recommendations
-npx oxc-audit --strict --security  # ask for more
-npx oxc-audit --strict --write     # apply a stricter set
+npx @entro314labs/oxc-audit                      # report only
+npx @entro314labs/oxc-audit --write              # apply the recommendations
+npx @entro314labs/oxc-audit --strict --security  # ask for more
+npx @entro314labs/oxc-audit --strict --write     # apply a stricter set
 ```
 
 Four tools, one pass:
 
-| Tool                   | What it gets                                                    | Written to       |
-| ---------------------- | --------------------------------------------------------------- | ---------------- |
-| `oxlint`               | Plugins, categories and targeted rules for the detected stack   | `.oxlintrc.json` |
-| `oxlint-tsgolint`      | Type-aware rules, scaled by level, when the engine is installed | `.oxlintrc.json` |
-| `oxlint-audit-plugins` | Custom plugins for the frameworks and libraries in use          | `.oxlintrc.json` |
-| `oxfmt`                | Formatter settings, carried over from Prettier or Biome         | `.oxfmtrc.jsonc` |
+| Tool                                 | What it gets                                                    | Written to       |
+| ------------------------------------ | --------------------------------------------------------------- | ---------------- |
+| `oxlint`                             | Plugins, categories and targeted rules for the detected stack   | `.oxlintrc.json` |
+| `oxlint-tsgolint`                    | Type-aware rules, scaled by level, when the engine is installed | `.oxlintrc.json` |
+| `@entro314labs/oxlint-audit-plugins` | Custom plugins for the frameworks and libraries in use          | `.oxlintrc.json` |
+| `oxfmt`                              | Formatter settings, carried over from Prettier or Biome         | `.oxfmtrc.jsonc` |
 
 Nothing is written for a tool that is not installed. Where a capability is wanted but its
 engine is missing, it is reported as a prerequisite rather than configured, because a config
 naming a missing engine is one Oxlint refuses to start on. That covers `oxlint-tsgolint` for
-the type-aware rules, and `oxlint-audit-plugins` for the custom ones.
+the type-aware rules, and `@entro314labs/oxlint-audit-plugins` for the custom ones.
 
 `--write` also adds `lint`, `lint:fix`, `format` and `format:check` scripts to `package.json`
 when they are absent, so there is something to run. An existing script of the same name is
@@ -36,16 +36,16 @@ manager, never installed — the lockfile is the project's to change.
 
 ## The custom plugins
 
-`oxlint-audit-plugins` on npm, built from [plugins/](plugins/). One install, and the runtime
+`@entro314labs/oxlint-audit-plugins` on npm, built from [plugins/](plugins/). One install, and the runtime
 every plugin imports arrives with it as a dependency:
 
 ```bash
-pnpm add -D oxlint-audit-plugins
+pnpm add -D @entro314labs/oxlint-audit-plugins
 ```
 
 ```jsonc
 {
-  "jsPlugins": ["oxlint-audit-plugins/data-layer"],
+  "jsPlugins": ["@entro314labs/oxlint-audit-plugins/data-layer"],
   "rules": { "data-layer/no-zod-trim-after-min-length": "error" }
 }
 ```
@@ -355,7 +355,7 @@ Exit code is `0` when the audit succeeds and `1` when it hits an error or a bloc
 ### Library
 
 ```ts
-import { audit, detectStack, recommendForStack, mergeRecommendations } from 'oxc-audit'
+import { audit, detectStack, recommendForStack, mergeRecommendations } from '@entro314labs/oxc-audit'
 
 const report = await audit({
   projectDir: process.cwd(),

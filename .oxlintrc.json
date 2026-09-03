@@ -5,7 +5,7 @@
     // Deliberately broken code, kept so the plugin package can prove its rules still fire.
     "plugins/fixtures",
     // Generated copies of plugins/src. Linting them reports every finding twice, and
-    // `pnpm --filter oxlint-audit-plugins check:skill-assets` is what keeps them in sync.
+    // `pnpm --filter @entro314labs/oxlint-audit-plugins check:skill-assets` is what keeps them in sync.
     "plugins/skills/*/assets"
   ],
 
