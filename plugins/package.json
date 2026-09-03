@@ -1,6 +1,6 @@
 {
-	"name": "oxlint-audit-plugins",
-	"version": "1.3.0",
+	"name": "@entro314-labs/oxlint-audit-plugins",
+	"version": "1.3.1",
 	"private": false,
 	"description": "Oxlint rules extracted from the version-locked stack audit prompts: deprecated APIs, migration residue and security footguns across Next.js/React, the data layer, AI SDK/payment integrations and the JS toolchain.",
 	"type": "module",
@@ -25,7 +25,7 @@
 		"prepublishOnly": "pnpm check && pnpm build",
 		"sync:skill-assets": "node scripts/sync-skill-assets.mjs",
 		"test": "for f in src/*/rules/*.test.ts; do echo \"  $f\" && tsx \"$f\" || exit 1; done",
-		"test:fixtures": "oxlint -c oxlintrc.audit.json --deny-warnings fixtures > /dev/null 2>&1 && echo 'fixtures produced no findings \u2014 the integration fixture has regressed' && exit 1 || echo 'fixtures still trip the plugins'",
+		"test:fixtures": "oxlint -c oxlintrc.audit.json --deny-warnings fixtures > /dev/null 2>&1 && echo 'fixtures produced no findings — the integration fixture has regressed' && exit 1 || echo 'fixtures still trip the plugins'",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
@@ -37,9 +37,9 @@
 		"oxlint-tsgolint": "^7.0.2001",
 		"tsdown": "^0.22.14",
 		"tsx": "^4.23.12",
-		"typescript": "^7.0.2"
+		"typescript": "next"
 	},
-	"packageManager": "pnpm@11.21.0",
+	"packageManager": "pnpm@11.22.0",
 	"license": "MIT",
 	"engines": {
 		"node": ">=20.19.0"
