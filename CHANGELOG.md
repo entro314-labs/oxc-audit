@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- Oxlint and `@oxlint/plugins` moved to `^1.81.0`.
+- `docs/oxlint-rules.tsv` refreshed against Oxlint 1.81. Oxlint 1.79 dropped
+  `react/react-compiler` and added the 22 React Compiler rules that replaced it, so a config
+  generated for a React project now carries 12 of them through `correctness` at every level and
+  four more through `suspicious` at `recommended`, without the recommender naming any of them.
+  `jsdoc/no-blank-blocks` and `one-var` were added too. The two `suspicious` rules that check
+  dependency arrays overlap `react/exhaustive-deps`, which `correctness` already enables, so from
+  the `recommended` level a missing dependency reports twice. This tool never writes an `off`, so
+  silencing one side is the project's call.
+
 ## [1.0.0] - 2026-08-11
 
 Initial release.
