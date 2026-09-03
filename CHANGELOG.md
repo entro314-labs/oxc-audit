@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-09-03
+
 ### Changed
 
 - Oxlint and `@oxlint/plugins` moved to `^1.81.0`.
@@ -74,3 +76,7 @@ Initial release.
   rather than silent. `pnpm-workspace.yaml`, `package.json` workspaces (both array and
   object forms), and `lerna.json` are read; with no declaration every package found on
   disk is audited as before.
+
+[Unreleased]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/entro314-labs/oxc-audit/compare/v1.0.0...v1.3.1
+[1.0.0]: https://github.com/entro314-labs/oxc-audit/releases/tag/v1.0.0
