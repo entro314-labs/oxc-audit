@@ -25,7 +25,7 @@ import { updatePackageJson } from './package-updater.js'
 import { acquireProjectLock, ProjectLockedError } from './project-lock.js'
 import { CollectingReporter } from './reporter.js'
 import { DEFAULT_REQUEST, findPrerequisites, recommendForStack } from './rule-recommender.js'
-import { detectStack, withForcedSignals } from './stack-detector.js'
+import { detectStack, hasSignal, withForcedSignals } from './stack-detector.js'
 import type {
   AuditOptions,
   AuditRequest,
@@ -118,7 +118,9 @@ async function runAudit(
     reporter.info(`No Oxlint config found; a new one would be created at ${configPath}`)
   }
 
-  const configFindings = await auditConfigFiles(projectDir, reporter)
+  const configFindings = await auditConfigFiles(projectDir, reporter, {
+    hasNextjs: hasSignal(stack, 'nextjs'),
+  })
 
   options.signal?.throwIfAborted()
 
@@ -206,7 +208,7 @@ async function runAudit(
     recommendations: merge.applied,
     alreadySatisfied: merge.alreadySatisfied,
     configFindings,
-    prerequisites: findPrerequisites(stack),
+    prerequisites: findPrerequisites(stack, request),
     explicitlyDisabled: merge.explicitlyDisabled,
     config: {
       path: configPath,

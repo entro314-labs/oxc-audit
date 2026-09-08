@@ -1,10 +1,9 @@
+import { join } from 'node:path'
+
 import { z } from 'zod'
 
-import {
-  findClosestPackageJson,
-  readJsonFilePreservingKeyOrder,
-  writeTextFileAtomically,
-} from './fs-utils.js'
+import { pathExists, readJsonFilePreservingKeyOrder, writeTextFileAtomically } from './fs-utils.js'
+import { AUDIT_PLUGINS_PACKAGE } from './stack-detector.js'
 import type { PackageUpdate, Reporter } from './types.js'
 
 const PackageJsonSchema = z
@@ -42,19 +41,21 @@ const SCRIPTS: ScriptTemplate[] = [
 /**
  * Tools the written config needs on disk before any of it runs.
  *
- * `@oxlint/plugins` is listed whenever the config registers a js plugin: every plugin
- * imports it, and without it Oxlint fails to load the plugin and refuses to start.
+ * `@oxlint/plugins` is the runtime every js plugin imports; without it Oxlint fails to load
+ * the plugin and refuses to start. The audit plugin package declares it as a dependency, so
+ * a manifest naming that package already has the runtime and is not asked for it twice.
  */
-function requiredTools(options: {
-  typeAware: boolean
-  format: boolean
-  jsPlugins: boolean
-}): string[] {
+function requiredTools(
+  manifest: PackageJson,
+  options: { typeAware: boolean; format: boolean; jsPlugins: boolean },
+): string[] {
   return [
     'oxlint',
     ...(options.format ? ['oxfmt'] : []),
     ...(options.typeAware ? ['oxlint-tsgolint'] : []),
-    ...(options.jsPlugins ? ['@oxlint/plugins'] : []),
+    ...(options.jsPlugins && !hasDependency(manifest, AUDIT_PLUGINS_PACKAGE)
+      ? ['@oxlint/plugins']
+      : []),
   ]
 }
 
@@ -82,6 +83,10 @@ export function installCommand(packageManager: string | undefined, packages: str
  * and is left alone. Dependencies are reported rather than installed — running a package
  * manager is a side effect well beyond writing a config file, and the lockfile is the
  * project's to change.
+ *
+ * Only the manifest in the audited directory is touched. A parent's manifest is outside
+ * the directory the user named and outside the lock this run holds, and a `lint` script
+ * there would run against a tree the config written here does not cover.
  */
 export async function updatePackageJson(
   projectDir: string,
@@ -94,9 +99,9 @@ export async function updatePackageJson(
     signal?: AbortSignal
   },
 ): Promise<PackageUpdate | undefined> {
-  const packageJsonPath = await findClosestPackageJson(projectDir)
+  const packageJsonPath = join(projectDir, 'package.json')
 
-  if (!packageJsonPath) {
+  if (!(await pathExists(packageJsonPath))) {
     return undefined
   }
 
@@ -133,7 +138,7 @@ export async function updatePackageJson(
     scriptsAdded.push(name)
   }
 
-  const missingDependencies = requiredTools(options).filter(
+  const missingDependencies = requiredTools(manifest, options).filter(
     (tool) => !hasDependency(manifest, tool),
   )
   const packageManager =

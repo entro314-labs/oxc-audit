@@ -237,6 +237,73 @@ describe('audit plugin prerequisites', () => {
 
     expect(capabilities.some((entry) => entry.startsWith('Stack-specific'))).toBe(false)
   })
+
+  // An install the requested level would not use is not a prerequisite of anything: the
+  // user would follow the advice, re-run, and see nothing change.
+  it('does not ask for the type-aware engine at basic, where no type-aware rule runs', () => {
+    const capabilities = findPrerequisites(
+      stackOf(['typescript', 'tsconfig', 'zod']),
+      request({ level: 'basic' }),
+    ).map(({ capability }) => capability)
+
+    // The audit plugins have no level of their own, so that install still changes the run.
+    expect(capabilities).toEqual(['Stack-specific audit rules (data-layer, slop-stop)'])
+  })
+
+  it('asks for a domain plugin at basic when that domain is on', () => {
+    const capabilities = findPrerequisites(
+      stackOf(['esm', 'supabase']),
+      request({ level: 'basic', domains: ['security'] }),
+    ).map(({ capability }) => capability)
+
+    expect(capabilities).toEqual(['Stack-specific audit rules (supabase, web-security)'])
+  })
+
+  it('counts only the type-aware rules the level reaches', () => {
+    const reasonAt = (level: AuditRequest['level']): string | undefined =>
+      findPrerequisites(stackOf(['typescript', 'tsconfig']), request({ level })).find(
+        ({ capability }) => capability === 'Type-aware linting',
+      )?.reason
+
+    expect(reasonAt('recommended')).toMatch(/^\d+ type-aware rules at the recommended level/u)
+    expect(reasonAt('paranoid')).toMatch(/^59 type-aware rules at the paranoid level/u)
+  })
+
+  it("names the project's own package manager in the install command", () => {
+    const stack = { ...stackOf(['tsconfig', 'zod']), packageManager: 'yarn@4.5.0' }
+
+    expect(findPrerequisites(stack).map(({ install }) => install)).toEqual([
+      'yarn add -D oxlint-tsgolint',
+      'yarn add -D @entro314labs/oxlint-audit-plugins',
+    ])
+  })
+})
+
+/**
+ * `react/no-danger` bans the prop outright; `web-security/require-sanitized-html` permits
+ * the sanitised form. The plugin package documents them as one-or-the-other, so once the
+ * plugin is in, the built-in rule would only re-report what the plugin rule had allowed.
+ */
+describe('rules a plugin supersedes', () => {
+  const securityRequest = request({ level: 'basic', domains: ['security'] })
+
+  it('stands react/no-danger down when web-security is recommended', () => {
+    const targets = recommendForStack(
+      stackOf(['audit-plugins', 'oxlint-plugins', 'react', 'typescript']),
+      securityRequest,
+    ).map(({ target }) => target)
+
+    expect(targets).toContain('web-security/require-sanitized-html')
+    expect(targets).not.toContain('react/no-danger')
+  })
+
+  it('keeps react/no-danger when the plugin package is absent', () => {
+    const targets = recommendForStack(stackOf(['react', 'typescript']), securityRequest).map(
+      ({ target }) => target,
+    )
+
+    expect(targets).toContain('react/no-danger')
+  })
 })
 
 function request(overrides: Partial<AuditRequest> = {}): AuditRequest {

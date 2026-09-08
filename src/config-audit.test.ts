@@ -175,6 +175,36 @@ describe('auditConfigFiles', () => {
     ])
   })
 
+  it('recognises Next.js from any spelling of its config file', async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({ name: 'leaf' }),
+      'next.config.mjs': 'export default {}\n',
+      'tsconfig.json': JSON.stringify({
+        include: ['src'],
+        compilerOptions: { baseUrl: '.', strict: true },
+      }),
+    })
+
+    expect(keys(await auditConfigFiles(dir, new CollectingReporter()))).toEqual([
+      'tsconfig.json:compilerOptions.baseUrl',
+    ])
+  })
+
+  it('takes the Next.js signal from the caller when one is supplied', async () => {
+    // A `--next` assertion reaches here through the stack rather than through the disk.
+    const dir = await setupProject({
+      'tsconfig.json': JSON.stringify({
+        include: ['src'],
+        compilerOptions: { baseUrl: '.', strict: true },
+      }),
+    })
+
+    expect(
+      keys(await auditConfigFiles(dir, new CollectingReporter(), { hasNextjs: true })),
+    ).toEqual(['tsconfig.json:compilerOptions.baseUrl'])
+    expect(await auditConfigFiles(dir, new CollectingReporter(), { hasNextjs: false })).toEqual([])
+  })
+
   it('leaves those options alone outside a Next.js project', async () => {
     const dir = await setupProject({
       'package.json': JSON.stringify({ name: 'app', dependencies: {} }),

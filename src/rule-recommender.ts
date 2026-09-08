@@ -1,4 +1,5 @@
-import { hasSignal } from './stack-detector.js'
+import { installCommand } from './package-updater.js'
+import { AUDIT_PLUGINS_PACKAGE, hasSignal } from './stack-detector.js'
 import { AUDIT_DOMAINS } from './types.js'
 import type {
   AuditDomain,
@@ -152,6 +153,11 @@ const TARGETED_RULES: Array<{
   /** Lowest level that enables it. A domain flag enables it regardless of the level. */
   level: AuditLevel
   domains?: AuditDomain[]
+  /**
+   * An audit plugin whose rules cover the same ground more precisely. When that plugin is
+   * recommended, this rule is not: the two would contradict each other.
+   */
+  supersededBy?: string
   reason: string
 }> = [
   {
@@ -237,11 +243,15 @@ const TARGETED_RULES: Array<{
     reason: 'Non-null assertions move a real runtime failure past the type checker.',
   },
   {
+    // Bans the prop outright. `web-security/require-sanitized-html` permits the sanitised
+    // form, so once that plugin is in this rule would report every legitimate rich-text
+    // render the plugin rule had deliberately allowed.
     rule: 'react/no-danger',
     level: 'basic',
     domains: ['security'],
     severity: 'error',
     requires: ['react'],
+    supersededBy: 'web-security',
     reason: 'dangerouslySetInnerHTML injects unescaped markup into the DOM.',
   },
   {
@@ -1052,7 +1062,64 @@ function auditPluginSpecifier(stack: ProjectStack, plugin: string): string {
   // `node_modules`. Reaching into `node_modules/.../src` would bypass both.
   return vendored
     ? `./tools/oxlint/audit-plugins/${plugin}/index.ts`
-    : `@entro314labs/oxlint-audit-plugins/${plugin}`
+    : `${AUDIT_PLUGINS_PACKAGE}/${plugin}`
+}
+
+/** The level and domains a request resolves to. */
+interface ResolvedRequest {
+  level: AuditLevel
+  domains: Set<AuditDomain>
+}
+
+/**
+ * `--dom` is not a separate mode. It resolves to the top of the ladder with every domain
+ * on, so one code path decides everything and `--dom` stays explainable as a shorthand.
+ */
+function resolveRequest(request: AuditRequest): ResolvedRequest {
+  return {
+    level: request.maximal ? 'paranoid' : request.level,
+    domains: new Set<AuditDomain>(request.maximal ? AUDIT_DOMAINS : request.domains),
+  }
+}
+
+/** A rule is in when the level reaches it, or when one of its domains was asked for. */
+function isWanted(
+  { level, domains }: ResolvedRequest,
+  entry: { level: AuditLevel; domains?: AuditDomain[] },
+): boolean {
+  return (
+    meetsLevel(level, entry.level) || (entry.domains ?? []).some((domain) => domains.has(domain))
+  )
+}
+
+/**
+ * The audit plugins the stack justifies and the request reaches, each with the signals
+ * behind it. Shared by the recommendations and the prerequisites so the two agree on
+ * which plugins a run would actually use.
+ */
+function selectAuditPlugins(
+  stack: ProjectStack,
+  resolved: ResolvedRequest,
+): Array<(typeof AUDIT_PLUGINS)[number] & { triggeredBy: StackSignalId[] }> {
+  return AUDIT_PLUGINS.flatMap((entry) => {
+    const triggeredBy = entry.requires.filter((signal) => hasSignal(stack, signal))
+
+    if (triggeredBy.length === 0) {
+      return []
+    }
+
+    // A js plugin has no level of its own: its rules target defects rather than taste, so
+    // the only question is whether the stack justifies it. A domain flag can pull one in
+    // that the level would not have reached.
+    const askedFor =
+      entry.domains === undefined || entry.domains.some((domain) => resolved.domains.has(domain))
+
+    if (!askedFor && !meetsLevel(resolved.level, 'recommended')) {
+      return []
+    }
+
+    return [{ ...entry, triggeredBy }]
+  })
 }
 
 /**
@@ -1066,14 +1133,18 @@ export function recommendForStack(
   request: AuditRequest = DEFAULT_REQUEST,
 ): Recommendation[] {
   const recommendations: Recommendation[] = []
-  // `--dom` is not a separate mode. It resolves to the top of the ladder with every domain
-  // on, so one code path decides everything and `--dom` stays explainable as a shorthand.
-  const level: AuditLevel = request.maximal ? 'paranoid' : request.level
-  const domains = new Set<AuditDomain>(request.maximal ? AUDIT_DOMAINS : request.domains)
-
-  /** A rule is in when the level reaches it, or when one of its domains was asked for. */
+  const resolved = resolveRequest(request)
+  const { level } = resolved
   const wanted = (entry: { level: AuditLevel; domains?: AuditDomain[] }): boolean =>
-    meetsLevel(level, entry.level) || (entry.domains ?? []).some((domain) => domains.has(domain))
+    isWanted(resolved, entry)
+
+  // The sources to point at, and the runtime they import. The published package declares
+  // `@oxlint/plugins` as a dependency, so installing it is enough; a copy vendored into the
+  // tree has no manifest to carry that, and needs the runtime declared separately. Getting
+  // this wrong either way is costly: a `jsPlugins` entry whose runtime is missing makes
+  // Oxlint refuse to start.
+  const auditPlugins = hasAuditPluginRuntime(stack) ? selectAuditPlugins(stack, resolved) : []
+  const auditPluginNames = new Set(auditPlugins.map(({ plugin }) => plugin))
 
   for (const { plugin, requires, reason } of PLUGIN_RULES) {
     const triggeredBy = requires.filter((signal) => hasSignal(stack, signal))
@@ -1090,7 +1161,7 @@ export function recommendForStack(
       continue
     }
 
-    const askedByDomain = (entry.domains ?? []).find((domain) => domains.has(domain))
+    const askedByDomain = (entry.domains ?? []).find((domain) => resolved.domains.has(domain))
 
     recommendations.push({
       kind: 'category',
@@ -1113,6 +1184,10 @@ export function recommendForStack(
     }
 
     if (!wanted(entry)) {
+      continue
+    }
+
+    if (entry.supersededBy !== undefined && auditPluginNames.has(entry.supersededBy)) {
       continue
     }
 
@@ -1151,46 +1226,23 @@ export function recommendForStack(
     }
   }
 
-  // The sources to point at, and the runtime they import. The published package declares
-  // `@oxlint/plugins` as a dependency, so installing it is enough; a copy vendored into the
-  // tree has no manifest to carry that, and needs the runtime declared separately. Getting
-  // this wrong either way is costly: a `jsPlugins` entry whose runtime is missing makes
-  // Oxlint refuse to start.
-  if (hasAuditPluginRuntime(stack)) {
-    for (const { plugin, requires, reason, rules, domains: pluginDomains } of AUDIT_PLUGINS) {
-      const triggeredBy = requires.filter((signal) => hasSignal(stack, signal))
+  for (const { plugin, reason, rules, triggeredBy } of auditPlugins) {
+    recommendations.push({
+      kind: 'js-plugin',
+      target: plugin,
+      specifier: auditPluginSpecifier(stack, plugin),
+      reason,
+      triggeredBy,
+    })
 
-      if (triggeredBy.length === 0) {
-        continue
-      }
-
-      // A js plugin has no level of its own: its rules target defects rather than taste,
-      // so the only question is whether the stack justifies it. A domain flag can pull one
-      // in that the level would not have reached.
-      const askedFor =
-        pluginDomains === undefined || pluginDomains.some((domain) => domains.has(domain))
-
-      if (!askedFor && !meetsLevel(level, 'recommended')) {
-        continue
-      }
-
+    for (const { rule, severity } of rules) {
       recommendations.push({
-        kind: 'js-plugin',
-        target: plugin,
-        specifier: auditPluginSpecifier(stack, plugin),
-        reason,
+        kind: 'rule',
+        target: rule,
+        severity,
+        reason: `Part of the ${plugin} plugin, which this project's stack justifies.`,
         triggeredBy,
       })
-
-      for (const { rule, severity } of rules) {
-        recommendations.push({
-          kind: 'rule',
-          target: rule,
-          severity,
-          reason: `Part of the ${plugin} plugin, which this project's stack justifies.`,
-          triggeredBy,
-        })
-      }
     }
   }
 
@@ -1201,23 +1253,31 @@ export function recommendForStack(
  * Capabilities the project could adopt but has not installed the tooling for.
  *
  * Reported instead of configured: writing type-aware config without the engine would
- * produce a config that fails at run time.
+ * produce a config that fails at run time. Only capabilities this request would actually
+ * use are reported - an install that changes nothing at the requested level is not a
+ * prerequisite of anything.
  */
-export function findPrerequisites(stack: ProjectStack): Prerequisite[] {
+export function findPrerequisites(
+  stack: ProjectStack,
+  request: AuditRequest = DEFAULT_REQUEST,
+): Prerequisite[] {
   const prerequisites: Prerequisite[] = []
+  const resolved = resolveRequest(request)
 
   if (hasSignal(stack, 'tsconfig') && !hasSignal(stack, 'tsgolint')) {
-    prerequisites.push({
-      capability: 'Type-aware linting',
-      reason: `${TYPE_AWARE_RULES.length} type-aware rules (including no-floating-promises) need type information, which Oxlint gets from the tsgolint engine.`,
-      install: 'pnpm add -D oxlint-tsgolint',
-    })
+    const reachable = TYPE_AWARE_RULES.filter((entry) => isWanted(resolved, entry))
+
+    if (reachable.length > 0) {
+      prerequisites.push({
+        capability: 'Type-aware linting',
+        reason: `${reachable.length} type-aware rules at the ${resolved.level} level (including no-floating-promises) need type information, which Oxlint gets from the tsgolint engine.`,
+        install: installCommand(stack.packageManager, ['oxlint-tsgolint']),
+      })
+    }
   }
 
   if (!hasAuditPluginRuntime(stack)) {
-    const applicable = AUDIT_PLUGINS.filter(({ requires }) =>
-      requires.some((signal) => hasSignal(stack, signal)),
-    ).map(({ plugin }) => plugin)
+    const applicable = selectAuditPlugins(stack, resolved).map(({ plugin }) => plugin)
 
     if (applicable.length > 0) {
       prerequisites.push({
@@ -1225,9 +1285,9 @@ export function findPrerequisites(stack: ProjectStack): Prerequisite[] {
         // One install is enough: the package declares `@oxlint/plugins` as a dependency, so
         // the runtime every plugin imports arrives with it.
         reason: `This project's dependencies match ${applicable.length} of the audit plugins, which catch deprecated APIs and migration residue that still type-checks and still runs.`,
-        install: hasSignal(stack, 'audit-plugins')
-          ? 'pnpm add -D @oxlint/plugins'
-          : 'pnpm add -D @entro314labs/oxlint-audit-plugins',
+        install: installCommand(stack.packageManager, [
+          hasSignal(stack, 'audit-plugins') ? '@oxlint/plugins' : AUDIT_PLUGINS_PACKAGE,
+        ]),
       })
     }
   }

@@ -42,9 +42,21 @@ const SOURCE_EXTENSIONS = new Set([
 ])
 const DEFAULT_MAX_FILES = 5000
 
+/** The npm package that ships the custom plugins, and carries their runtime as a dependency. */
+export const AUDIT_PLUGINS_PACKAGE = '@entro314labs/oxlint-audit-plugins'
+
+/** Every spelling of the Next.js config file; any one establishes the `nextjs` signal. */
+export const NEXT_CONFIG_FILES = [
+  'next.config.js',
+  'next.config.mjs',
+  'next.config.ts',
+  'next.config.mts',
+]
+
 const PackageManifestSchema = z
   .object({
     type: z.string().optional(),
+    packageManager: z.string().optional(),
     bin: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
     engines: z.record(z.string(), z.string()).optional(),
     workspaces: z.union([z.array(z.string()), z.record(z.string(), z.unknown())]).optional(),
@@ -67,10 +79,7 @@ const CONFIG_FILE_SIGNALS: Array<{ id: StackSignalId; files: string[] }> = [
   { id: 'tsconfig', files: ['tsconfig.json'] },
   { id: 'svelte', files: ['svelte.config.js', 'svelte.config.ts', 'svelte.config.mjs'] },
   { id: 'astro', files: ['astro.config.mjs', 'astro.config.ts', 'astro.config.js'] },
-  {
-    id: 'nextjs',
-    files: ['next.config.js', 'next.config.mjs', 'next.config.ts', 'next.config.mts'],
-  },
+  { id: 'nextjs', files: NEXT_CONFIG_FILES },
   { id: 'vue', files: ['vue.config.js', 'vue.config.ts', 'nuxt.config.ts', 'nuxt.config.js'] },
   {
     id: 'vitest',
@@ -115,7 +124,7 @@ const DEPENDENCY_SIGNALS: Array<{ id: StackSignalId; packages: string[] }> = [
   { id: 'vite', packages: ['vite'] },
   // Supplies the js plugins. Without it a `jsPlugins` entry names a file that does not
   // exist and Oxlint refuses to start, so its presence gates those recommendations.
-  { id: 'audit-plugins', packages: ['@entro314labs/oxlint-audit-plugins'] },
+  { id: 'audit-plugins', packages: [AUDIT_PLUGINS_PACKAGE] },
   // Every js plugin imports `@oxlint/plugins`. Without it Oxlint fails to load the plugin
   // and refuses to start, so a `jsPlugins` entry is only safe once this is present.
   { id: 'oxlint-plugins', packages: ['@oxlint/plugins'] },
@@ -192,6 +201,7 @@ export async function detectStack(
   return {
     projectDir: resolvedDir,
     packageJsonPath,
+    packageManager: manifest?.packageManager,
     signals,
     sourceExtensions: [...scan.extensions].sort(),
     filesScanned: scan.filesScanned,

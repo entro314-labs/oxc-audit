@@ -173,6 +173,8 @@ export type StackSignalId =
 export interface ProjectStack {
   projectDir: string
   packageJsonPath: string | undefined
+  /** The manifest's `packageManager` field, so install commands name the right tool. */
+  packageManager?: string
   signals: StackSignal[]
   /** File extensions actually present in the scanned source tree. */
   sourceExtensions: string[]

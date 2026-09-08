@@ -7,6 +7,7 @@ import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 
 import { isPathNotFoundError, pathExists } from './fs-utils.js'
+import { NEXT_CONFIG_FILES } from './stack-detector.js'
 import type { ConfigFinding, ConfigFindingSeverity, Reporter } from './types.js'
 
 /**
@@ -456,10 +457,14 @@ function auditEngines(manifest: z.infer<typeof PackageManifestSchema>): ConfigFi
  *
  * Absent files are skipped silently - a project without `turbo.json` is not a monorepo, not
  * a misconfigured one.
+ *
+ * `hasNextjs` is the stack's `nextjs` signal when the caller has one, which also covers a
+ * `--next` assertion. Without it the same facts are read off disk here.
  */
 export async function auditConfigFiles(
   projectDir: string,
   reporter: Reporter,
+  options: { hasNextjs?: boolean } = {},
 ): Promise<ConfigFinding[]> {
   const findings: ConfigFinding[] = []
 
@@ -501,11 +506,28 @@ export async function auditConfigFiles(
     reporter,
   )
   if (tsconfig !== null) {
-    const declared = { ...manifest?.dependencies, ...manifest?.devDependencies }
-    const hasNextjs =
-      declared.next !== undefined || (await pathExists(join(projectDir, 'next.config.ts')))
-    findings.push(...auditTsconfig(tsconfig, hasNextjs))
+    findings.push(
+      ...auditTsconfig(tsconfig, options.hasNextjs ?? (await detectNextjs(projectDir, manifest))),
+    )
   }
 
   return findings
+}
+
+/** The `nextjs` signal as the stack detector establishes it: the dependency or a config file. */
+async function detectNextjs(
+  projectDir: string,
+  manifest: z.infer<typeof PackageManifestSchema> | null,
+): Promise<boolean> {
+  if (manifest?.dependencies?.next !== undefined || manifest?.devDependencies?.next !== undefined) {
+    return true
+  }
+
+  for (const fileName of NEXT_CONFIG_FILES) {
+    if (await pathExists(join(projectDir, fileName))) {
+      return true
+    }
+  }
+
+  return false
 }

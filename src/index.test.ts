@@ -198,6 +198,52 @@ describe('audit', () => {
     expect(await readFile(join(dir, '.oxlintrc.json'), 'utf-8')).toBe('{ "rules": [ }\n')
   })
 
+  // The audited directory is the boundary. A parent manifest is outside it and outside
+  // the lock, and a `lint` script there would run over a tree this config does not cover.
+  it('leaves a parent manifest alone when the audited directory has none', async () => {
+    const parent = await setupProject({
+      'package.json': JSON.stringify({ name: 'parent', devDependencies: { typescript: '^5' } }),
+      'sub/src/a.ts': 'export const a = 1\n',
+    })
+
+    const report = await audit({ projectDir: join(parent, 'sub'), write: true })
+
+    expect(report.success).toBe(true)
+    expect(report.packageUpdate).toBeUndefined()
+    expect(await pathExists(join(parent, 'sub', '.oxlintrc.json'))).toBe(true)
+    expect(JSON.parse(await readFile(join(parent, 'package.json'), 'utf-8'))).not.toHaveProperty(
+      'scripts',
+    )
+  })
+
+  it('does not ask for @oxlint/plugins when the plugin package already supplies it', async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({
+        name: 'app',
+        dependencies: { zod: '^4.0.0' },
+        devDependencies: { oxlint: '^1.81.0', '@entro314labs/oxlint-audit-plugins': '^1.3.0' },
+      }),
+      'src/schema.ts': 'export const a = 1\n',
+    })
+
+    const report = await audit({ projectDir: dir, format: false })
+
+    expect(report.recommendations.some((entry) => entry.kind === 'js-plugin')).toBe(true)
+    expect(report.packageUpdate?.missingDependencies).toEqual([])
+  })
+
+  it('does ask for @oxlint/plugins when only a hand-written js plugin needs it', async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({ name: 'app', devDependencies: { oxlint: '^1.81.0' } }),
+      '.oxlintrc.json': JSON.stringify({ jsPlugins: ['./tools/house-rules.js'] }),
+      'src/a.ts': 'export const a = 1\n',
+    })
+
+    const report = await audit({ projectDir: dir, format: false })
+
+    expect(report.packageUpdate?.missingDependencies).toEqual(['@oxlint/plugins'])
+  })
+
   it('reports a missing project directory as an error', async () => {
     const report = await audit({ projectDir: join(tmpdir(), 'oxc-audit-does-not-exist-xyz') })
 
