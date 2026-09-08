@@ -700,23 +700,44 @@ const TYPE_AWARE_RULES: Array<{
     level: 'recommended',
     reason: 'Returning a value where void is expected means the caller silently discards it.',
   },
+  // These five sit in Oxlint's `correctness` category, which every level enables at `error`,
+  // so they run the moment `typeAware` is on. Naming them at anything below `error` would
+  // override the category and quietly weaken a check that was already active.
+  {
+    rule: 'typescript/no-duplicate-type-constituents',
+    severity: 'error',
+    level: 'recommended',
+    reason: 'A repeated union or intersection member is dead type code.',
+  },
+  {
+    rule: 'typescript/no-redundant-type-constituents',
+    severity: 'error',
+    level: 'recommended',
+    reason: 'A constituent absorbed by another makes the type mean less than it appears to.',
+  },
+  {
+    rule: 'typescript/no-meaningless-void-operator',
+    severity: 'error',
+    level: 'recommended',
+    reason: '`void` applied to something already void.',
+  },
+  {
+    rule: 'typescript/no-useless-default-assignment',
+    severity: 'error',
+    level: 'recommended',
+    reason: 'A default that can never be reached because the value is never undefined.',
+  },
+  {
+    rule: 'typescript/restrict-template-expressions',
+    severity: 'error',
+    level: 'recommended',
+    reason: 'Interpolating an object into a template produces `[object Object]`.',
+  },
   {
     rule: 'typescript/no-confusing-void-expression',
     severity: 'warn',
     level: 'strict',
     reason: 'Using a void expression as a value reads as if it produced something.',
-  },
-  {
-    rule: 'typescript/no-duplicate-type-constituents',
-    severity: 'warn',
-    level: 'strict',
-    reason: 'A repeated union or intersection member is dead type code.',
-  },
-  {
-    rule: 'typescript/no-redundant-type-constituents',
-    severity: 'warn',
-    level: 'strict',
-    reason: 'A constituent absorbed by another makes the type mean less than it appears to.',
   },
   {
     rule: 'typescript/no-unnecessary-boolean-literal-compare',
@@ -753,18 +774,6 @@ const TYPE_AWARE_RULES: Array<{
     severity: 'warn',
     level: 'strict',
     reason: 'A namespace qualifier that resolves to the enclosing scope.',
-  },
-  {
-    rule: 'typescript/no-meaningless-void-operator',
-    severity: 'warn',
-    level: 'strict',
-    reason: '`void` applied to something already void.',
-  },
-  {
-    rule: 'typescript/no-useless-default-assignment',
-    severity: 'warn',
-    level: 'strict',
-    reason: 'A default that can never be reached because the value is never undefined.',
   },
   {
     rule: 'typescript/non-nullable-type-assertion-style',
@@ -832,12 +841,6 @@ const TYPE_AWARE_RULES: Array<{
     level: 'strict',
     reason:
       'A promise-returning function that is not async can throw synchronously, so callers need two error paths.',
-  },
-  {
-    rule: 'typescript/restrict-template-expressions',
-    severity: 'warn',
-    level: 'strict',
-    reason: 'Interpolating an object into a template produces `[object Object]`.',
   },
   {
     rule: 'typescript/return-await',

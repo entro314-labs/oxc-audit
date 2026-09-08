@@ -8,6 +8,8 @@ import { describe, expect, it } from 'vitest'
 
 import { OXLINT_DEFAULT_PLUGINS } from './config-merger.js'
 import { audit } from './index.js'
+import { getRecommendablePlugins, recommendForStack } from './rule-recommender.js'
+import type { AuditRequest, ProjectStack } from './types.js'
 
 const execFileAsync = promisify(execFile)
 const OXLINT_BIN = join(process.cwd(), 'node_modules', '.bin', 'oxlint')
@@ -343,11 +345,103 @@ describe('Vue targeted rules', () => {
 })
 
 /**
+ * A rule-level severity overrides the category that contains the rule. Recommending a rule
+ * at `warn` when its category is already on at `error` therefore weakens a check that was
+ * active before the run - the one thing the merger promises never to do, and the one case
+ * it cannot see, because the category's members are Oxlint's to know. Oxlint's own rule
+ * listing is the source of truth for that membership.
+ */
+describe('recommendations never weaken a rule its category already enables', () => {
+  const SEVERITY_RANK = { off: 0, warn: 1, error: 2 } as const
+
+  async function readRuleCategories(): Promise<Map<string, string>> {
+    // Every plugin enabled, so the listing covers rules the recommender can reach.
+    const dir = await setupProject({
+      '.oxlintrc.json': JSON.stringify({
+        plugins: getRecommendablePlugins(),
+      }),
+    })
+    const { stdout } = await run(['--rules', '--format=json', '-c', '.oxlintrc.json'], dir)
+    const listing = JSON.parse(stdout) as Array<{ scope: string; value: string; category: string }>
+
+    return new Map(
+      listing.map(({ scope, value, category }) => [
+        // `--rules` spells plugin scopes with underscores where configs use hyphens.
+        scope === 'eslint' ? value : `${scope.replaceAll('_', '-')}/${value}`,
+        category,
+      ]),
+    )
+  }
+
+  const stack: ProjectStack = {
+    projectDir: '/project',
+    packageJsonPath: '/project/package.json',
+    signals: (
+      [
+        'typescript',
+        'tsconfig',
+        'tsgolint',
+        'jsx',
+        'react',
+        'react-dom',
+        'nextjs',
+        'vue',
+        'vitest',
+        'jest',
+        'node',
+        'jsdoc',
+        'esm',
+      ] as const
+    ).map((id) => ({ id, evidence: [{ kind: 'dependency' as const, value: id }] })),
+    sourceExtensions: ['.ts', '.tsx', '.vue'],
+    filesScanned: 3,
+    scanTruncated: false,
+  }
+
+  const requests: AuditRequest[] = [
+    ...(['basic', 'recommended', 'strict', 'paranoid'] as const).map((level) => ({
+      level,
+      domains: [],
+      maximal: false,
+      forcedSignals: [],
+    })),
+    { level: 'paranoid', domains: [], maximal: true, forcedSignals: [] },
+  ]
+
+  it.each(requests)('holds at %o', async (request) => {
+    const categories = await readRuleCategories()
+    const recommendations = recommendForStack(stack, request)
+    const categorySeverity = new Map<string, keyof typeof SEVERITY_RANK>()
+
+    for (const entry of recommendations) {
+      if (entry.kind === 'category' && entry.severity) {
+        categorySeverity.set(entry.target, entry.severity)
+      }
+    }
+
+    const weakened = recommendations
+      .filter((entry) => entry.kind === 'rule' && entry.severity !== undefined)
+      .filter((entry) => {
+        const category = categories.get(entry.target)
+        const enabledAt = category === undefined ? undefined : categorySeverity.get(category)
+
+        return (
+          enabledAt !== undefined &&
+          SEVERITY_RANK[entry.severity ?? 'off'] < SEVERITY_RANK[enabledAt]
+        )
+      })
+      .map((entry) => `${entry.target}: ${entry.severity} (${categories.get(entry.target)})`)
+
+    expect(weakened).toEqual([])
+  })
+})
+
+/**
  * Every level has to produce a config Oxlint accepts, not just the default one.
  *
- * The higher levels reach categories the tool never wrote before - `restriction` and
- * `style` - and enable most of tsgolint's rule set. A level that emits something Oxlint
- * rejects at load time would leave the project with no working lint at all.
+ * The higher levels enable most of tsgolint's rule set and reach categories the default
+ * run never touches. A level that emits something Oxlint rejects at load time would leave
+ * the project with no working lint at all.
  */
 describe('every level produces a config Oxlint accepts', () => {
   const levels = ['basic', 'recommended', 'strict', 'paranoid'] as const
