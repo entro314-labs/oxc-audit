@@ -63,6 +63,18 @@ export interface ExistingFormatterConfig {
   readonly settings: OxfmtConfig
 }
 
+/**
+ * Biome enum values whose oxfmt spelling differs. A value copied across unchanged makes
+ * oxfmt refuse the whole file ("unknown variant `asNeeded`"), so only values with a known
+ * counterpart are carried, and an unrecognised one is left behind like any other key with
+ * no equivalent.
+ */
+const BIOME_ARROW_PARENTHESES: Record<string, string> = { always: 'always', asNeeded: 'avoid' }
+const BIOME_QUOTE_PROPERTIES: Record<string, string> = {
+  asNeeded: 'as-needed',
+  preserve: 'preserve',
+}
+
 /** Translate a Prettier config into the oxfmt keys that mean the same thing. */
 export function fromPrettier(config: Record<string, unknown>): OxfmtConfig {
   const settings: Record<string, unknown> = {}
@@ -99,16 +111,14 @@ export function fromBiome(config: {
   }
   if (javascript?.semicolons !== undefined) settings.semi = javascript.semicolons !== 'asNeeded'
   if (javascript?.trailingCommas !== undefined) settings.trailingComma = javascript.trailingCommas
-  if (javascript?.arrowParentheses !== undefined) {
-    settings.arrowParens = javascript.arrowParentheses
-  }
+  const arrowParens = BIOME_ARROW_PARENTHESES[javascript?.arrowParentheses ?? '']
+  if (arrowParens !== undefined) settings.arrowParens = arrowParens
   if (javascript?.bracketSpacing !== undefined) settings.bracketSpacing = javascript.bracketSpacing
   if (javascript?.bracketSameLine !== undefined) {
     settings.bracketSameLine = javascript.bracketSameLine
   }
-  if (javascript?.quoteProperties !== undefined) {
-    settings.quoteProps = javascript.quoteProperties
-  }
+  const quoteProps = BIOME_QUOTE_PROPERTIES[javascript?.quoteProperties ?? '']
+  if (quoteProps !== undefined) settings.quoteProps = quoteProps
 
   return settings
 }

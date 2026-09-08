@@ -52,6 +52,25 @@ describe('carrying settings across from Biome', () => {
     expect(fromBiome({ formatter: { indentStyle: 'space' } })).toEqual({ useTabs: false })
   })
 
+  // oxfmt rejects a config carrying Biome's spelling outright ("unknown variant
+  // `asNeeded`"), so each enum has to arrive in oxfmt's vocabulary or not at all.
+  it('respells the enum values oxfmt names differently', () => {
+    expect(
+      fromBiome({
+        javascript: { formatter: { arrowParentheses: 'asNeeded', quoteProperties: 'asNeeded' } },
+      }),
+    ).toEqual({ arrowParens: 'avoid', quoteProps: 'as-needed' })
+    expect(
+      fromBiome({
+        javascript: { formatter: { arrowParentheses: 'always', quoteProperties: 'preserve' } },
+      }),
+    ).toEqual({ arrowParens: 'always', quoteProps: 'preserve' })
+  })
+
+  it('leaves an enum value it cannot translate behind rather than copying it', () => {
+    expect(fromBiome({ javascript: { formatter: { arrowParentheses: 'sometimes' } } })).toEqual({})
+  })
+
   it('returns nothing for a Biome config with no formatter section', () => {
     expect(fromBiome({})).toEqual({})
   })
