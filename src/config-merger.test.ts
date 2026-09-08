@@ -89,6 +89,28 @@ describe('mergeRecommendations - js plugins', () => {
   })
 })
 
+describe('mergeRecommendations - a recommended off fills a gap and never overrides', () => {
+  it('writes the off when the rule is not mentioned', () => {
+    const { config, applied } = mergeRecommendations({}, [rule('react/react-in-jsx-scope', 'off')])
+
+    expect(config.rules?.['react/react-in-jsx-scope']).toBe('off')
+    expect(applied).toHaveLength(1)
+  })
+
+  it.each(['warn', 'error', 'off'] as const)('leaves an explicit %s alone', (existing) => {
+    const { config, applied, alreadySatisfied, explicitlyDisabled } = mergeRecommendations(
+      { rules: { 'react/react-in-jsx-scope': existing } },
+      [rule('react/react-in-jsx-scope', 'off')],
+    )
+
+    expect(config.rules?.['react/react-in-jsx-scope']).toBe(existing)
+    expect(applied).toEqual([])
+    expect(alreadySatisfied).toHaveLength(1)
+    // A project's own `error` is not an opt-out, so it is not reported as one.
+    expect(explicitlyDisabled).toEqual([])
+  })
+})
+
 describe('mergeRecommendations - never weakens', () => {
   it('leaves a stricter existing rule severity alone', () => {
     const { config, applied, alreadySatisfied } = mergeRecommendations(

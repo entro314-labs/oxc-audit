@@ -198,6 +198,12 @@ is what makes it safe in CI.
 3. **An explicit `off` is a decision.** A rule you turned off stays off. It is reported so
    the opt-out stays visible, but never re-enabled.
 
+One recommendation reads as a removal and is not one. `suspicious` carries
+`react/react-in-jsx-scope`, which demands a `React` binding the automatic JSX runtime never
+uses, so on a React 17+ or Next.js project it would report every component file. On that
+evidence alone - a `react` range that cannot resolve below 17, or Next.js - the rule is
+written as `off`, and only into a gap: any value you set for it, a re-enable included, stands.
+
 Those invariants are asserted directly, over a matrix of existing configs, in
 `src/config-merger.test.ts`.
 
@@ -221,6 +227,7 @@ Those invariants are asserted directly, over a matrix of existing configs, in
 | `tsconfig`            | `tsconfig.json` (tracked separately - type-aware linting needs a real one)    |
 | `tsgolint`            | `oxlint-tsgolint` dependency                                                  |
 | `jsdoc`               | `jsdoc` or `typedoc` dependency                                               |
+| `react-jsx-runtime`   | a `react` range that cannot resolve below 17, or the `nextjs` signal          |
 
 A further set of signals exists only to decide which custom plugins apply, and each is
 established by its dependency alone: `zod`, `tanstack-query`, `zustand`, `react-hook-form`,

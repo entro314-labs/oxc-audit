@@ -4,9 +4,10 @@ import { dirname, join } from 'node:path'
 
 import { describe, expect, it } from 'vitest'
 
-import { auditConfigFiles, compareVersions, minimumVersionOf } from './config-audit.js'
+import { auditConfigFiles } from './config-audit.js'
 import { CollectingReporter } from './reporter.js'
 import type { ConfigFinding } from './types.js'
+import { compareVersions, minimumVersionOf } from './versions.js'
 
 async function setupProject(files: Record<string, string>): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'oxc-audit-config-'))

@@ -46,7 +46,8 @@ const PLUGIN_RULES: Array<{
     // Promoting the `suspicious` ones would only double-report - `exhaustive-effect-dependencies`
     // and `memo-dependencies` cover the ground `react/exhaustive-deps` already covers from
     // `correctness`, and `react/hooks` covers `react/rules-of-hooks`. Silencing either side
-    // would mean writing an `off`, which this tool does not do.
+    // would mean writing an `off` with no evidence that the rule is wrong for the project,
+    // and both sides are right; which one to keep is the project's call.
     plugin: 'react',
     requires: ['react', 'nextjs'],
     reason: 'React is a dependency, so the react rules apply.',
@@ -227,6 +228,19 @@ const TARGETED_RULES: Array<{
     severity: 'error',
     requires: ['react', 'nextjs'],
     reason: '`javascript:` in a JSX href executes on click in the page origin.',
+  },
+  {
+    // The one `off` this tool writes. `suspicious` carries `react-in-jsx-scope`, which demands
+    // a `React` binding the automatic runtime never needs, so on a React 17+ project the
+    // `recommended` config would report every component file. Oxlint has no runtime setting
+    // that quietens it, so the rule is turned off on the evidence that it cannot apply. Any
+    // explicit value the project set, including a re-enable, is left alone.
+    rule: 'react/react-in-jsx-scope',
+    level: 'recommended',
+    severity: 'off',
+    requires: ['react-jsx-runtime'],
+    reason:
+      'The automatic JSX runtime imports `react/jsx-runtime` itself, so requiring `React` in scope reports every component for a binding that is never used.',
   },
   {
     rule: 'typescript/no-explicit-any',

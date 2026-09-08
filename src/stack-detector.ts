@@ -10,6 +10,7 @@ import {
   readJsonFile,
 } from './fs-utils.js'
 import type { Evidence, ProjectStack, Reporter, StackSignal, StackSignalId } from './types.js'
+import { compareVersions, minimumVersionOf } from './versions.js'
 
 /** Directories never worth walking; skipping them keeps the scan bounded and fast. */
 const SKIPPED_DIRECTORIES = new Set([
@@ -173,6 +174,7 @@ export async function detectStack(
 
   const scan = await scanSourceTree(resolvedDir, options.maxFiles ?? DEFAULT_MAX_FILES)
   collectExtensionSignals(scan.extensions, addEvidence)
+  collectJsxRuntimeSignal(manifest, evidenceBySignal.get('nextjs'), addEvidence)
 
   // Dependency signals come from one manifest. In a workspace root the frameworks live in
   // the leaf packages, so a root-level audit under-reports and the user needs to know.
@@ -334,6 +336,44 @@ async function collectConfigFileSignals(
         addEvidence(id, { kind: 'config-file', value: fileName })
       }
     }
+  }
+}
+
+/**
+ * The automatic JSX runtime, read off the declared `react` range or the presence of Next.js.
+ *
+ * React 17 introduced `react/jsx-runtime` and every toolchain since compiles JSX against it
+ * by default, so a range that cannot resolve below 17 is evidence the runtime is automatic.
+ * A range this cannot reduce to a minimum establishes nothing. Next.js has compiled JSX
+ * that way on every supported version, so its own evidence carries across.
+ */
+function collectJsxRuntimeSignal(
+  manifest: PackageManifest | undefined,
+  nextjsEvidence: Evidence[] | undefined,
+  addEvidence: (id: StackSignalId, evidence: Evidence) => void,
+): void {
+  const groups = [
+    { kind: 'dependency' as const, entries: manifest?.dependencies },
+    { kind: 'dev-dependency' as const, entries: manifest?.devDependencies },
+    { kind: 'peer-dependency' as const, entries: manifest?.peerDependencies },
+  ]
+
+  for (const { kind, entries } of groups) {
+    const range = entries?.react
+
+    if (range === undefined) {
+      continue
+    }
+
+    const minimum = minimumVersionOf(range)
+
+    if (minimum !== null && compareVersions(minimum, '17.0.0') >= 0) {
+      addEvidence('react-jsx-runtime', { kind, value: `react@${range}` })
+    }
+  }
+
+  for (const evidence of nextjsEvidence ?? []) {
+    addEvidence('react-jsx-runtime', evidence)
   }
 }
 

@@ -73,6 +73,41 @@ describe('detectStack', () => {
     )
   })
 
+  it('establishes the automatic JSX runtime from a React 17+ range or from Next.js', async () => {
+    const cases: Array<{ manifest: object; files?: Record<string, string>; expected: boolean }> = [
+      { manifest: { dependencies: { react: '^19.0.0' } }, expected: true },
+      { manifest: { dependencies: { react: '~17.0.2' } }, expected: true },
+      { manifest: { peerDependencies: { react: '>=18' } }, expected: false },
+      { manifest: { dependencies: { react: '^16.14.0' } }, expected: false },
+      { manifest: { dependencies: { react: 'canary' } }, expected: false },
+      { manifest: {}, files: { 'next.config.mjs': 'export default {}\n' }, expected: true },
+      { manifest: { dependencies: { next: '^16.0.0' } }, expected: true },
+    ]
+
+    for (const { manifest, files, expected } of cases) {
+      const dir = await setupProject({
+        'package.json': JSON.stringify({ name: 'app', ...manifest }),
+        ...files,
+      })
+
+      const stack = await detectStack(dir, new CollectingReporter())
+
+      expect(hasSignal(stack, 'react-jsx-runtime')).toBe(expected)
+    }
+  })
+
+  it('records the range that established the automatic runtime', async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({ name: 'app', dependencies: { react: '^19.0.0' } }),
+    })
+
+    const stack = await detectStack(dir, new CollectingReporter())
+
+    expect(stack.signals.find(({ id }) => id === 'react-jsx-runtime')?.evidence).toEqual([
+      { kind: 'dependency', value: 'react@^19.0.0' },
+    ])
+  })
+
   it('reads jsx and typescript from the source tree', async () => {
     const dir = await setupProject({
       'package.json': JSON.stringify({ name: 'app' }),

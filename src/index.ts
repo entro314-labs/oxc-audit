@@ -427,7 +427,7 @@ function buildErrorReport(
   }
 }
 
-export { auditConfigFiles, compareVersions, minimumVersionOf } from './config-audit.js'
+export { auditConfigFiles } from './config-audit.js'
 export { mergeRecommendations, OXLINT_DEFAULT_PLUGINS } from './config-merger.js'
 export { detectStack, hasSignal } from './stack-detector.js'
 export {
@@ -441,3 +441,4 @@ export { CollectingReporter, DefaultReporter } from './reporter.js'
 export { discoverWorkspace, findWorkspacePackages } from './workspace.js'
 export { matchesGlob, readWorkspaceDeclaration } from './workspace-globs.js'
 export * from './types.js'
+export { compareVersions, minimumVersionOf } from './versions.js'

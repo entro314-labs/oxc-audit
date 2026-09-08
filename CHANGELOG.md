@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- A React 17+ or Next.js project's `recommended` config no longer reports every component
+  file under `react/react-in-jsx-scope`. The rule demands a `React` binding the automatic JSX
+  runtime never uses, and Oxlint has no runtime setting that quietens it, so it is now written
+  as `off` on that evidence - the one `off` this tool writes. It fills a gap only: a value the
+  project set for the rule, a re-enable included, is left alone. The new `react-jsx-runtime`
+  signal records the range or Next.js evidence behind it, and `--next` asserts it.
+- `compareVersions` and `minimumVersionOf` moved to their own module; both are still exported
+  from the package root.
+
 ### Fixed
 
 - The shipped `oxlintrc.audit.json` preset named `./src/<plugin>/index.ts`, which the

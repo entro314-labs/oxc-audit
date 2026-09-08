@@ -239,7 +239,7 @@ const LEVEL_HELP: Record<AuditLevel, string> = {
 const STACK_FLAGS: Record<string, StackSignalId[]> = {
   typescript: ['typescript', 'tsconfig'],
   react: ['react', 'react-dom', 'jsx'],
-  next: ['nextjs', 'react', 'react-dom', 'jsx'],
+  next: ['nextjs', 'react', 'react-dom', 'jsx', 'react-jsx-runtime'],
   vue: ['vue'],
   svelte: ['svelte'],
   astro: ['astro'],

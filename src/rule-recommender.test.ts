@@ -279,6 +279,55 @@ describe('audit plugin prerequisites', () => {
   })
 })
 
+describe('the one recommended off', () => {
+  it('turns react-in-jsx-scope off only on evidence of the automatic runtime', () => {
+    const off = (signals: StackSignalId[]): string | undefined =>
+      recommendForStack(stackOf(signals)).find(
+        ({ target }) => target === 'react/react-in-jsx-scope',
+      )?.severity
+
+    expect(off(['react', 'jsx', 'react-jsx-runtime'])).toBe('off')
+    expect(off(['react', 'jsx'])).toBeUndefined()
+  })
+
+  it('is the only off the recommender ever emits', () => {
+    const offs = recommendForStack(stackOf(FULL_STACK_WITH_RUNTIME), request({ maximal: true }))
+      .filter(({ severity }) => severity === 'off')
+      .map(({ target }) => target)
+
+    expect(offs).toEqual(['react/react-in-jsx-scope'])
+  })
+
+  it('needs suspicious to be on, since basic never enables the rule', () => {
+    const targets = recommendForStack(
+      stackOf(['react', 'jsx', 'react-jsx-runtime']),
+      request({ level: 'basic' }),
+    ).map(({ target }) => target)
+
+    expect(targets).not.toContain('react/react-in-jsx-scope')
+  })
+})
+
+const FULL_STACK_WITH_RUNTIME: StackSignalId[] = [
+  'typescript',
+  'tsconfig',
+  'tsgolint',
+  'jsx',
+  'react',
+  'react-dom',
+  'nextjs',
+  'react-jsx-runtime',
+  'vue',
+  'vitest',
+  'jest',
+  'node',
+  'jsdoc',
+  'esm',
+  'audit-plugins',
+  'zod',
+  'supabase',
+]
+
 /**
  * `react/no-danger` bans the prop outright; `web-security/require-sanitized-html` permits
  * the sanitised form. The plugin package documents them as one-or-the-other, so once the

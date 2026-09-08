@@ -424,6 +424,9 @@ describe('recommendations never weaken a rule its category already enables', () 
 
     const weakened = recommendations
       .filter((entry) => entry.kind === 'rule' && entry.severity !== undefined)
+      // An `off` is the deliberate exception: recommended only where evidence proves the
+      // rule cannot apply, and covered by its own test below.
+      .filter((entry) => entry.severity !== 'off')
       .filter((entry) => {
         const category = categories.get(entry.target)
         const enabledAt = category === undefined ? undefined : categorySeverity.get(category)
@@ -436,6 +439,56 @@ describe('recommendations never weaken a rule its category already enables', () 
       .map((entry) => `${entry.target}: ${entry.severity} (${categories.get(entry.target)})`)
 
     expect(weakened).toEqual([])
+  })
+})
+
+/**
+ * `suspicious` carries `react/react-in-jsx-scope`, which under the automatic JSX runtime
+ * reports every component file for a binding that is never used. The recommended config
+ * for a React 17+ project has to run clean on a plain component, and a project that
+ * re-enabled the rule keeps it.
+ */
+describe('the automatic JSX runtime', () => {
+  const COMPONENT = 'export function App() {\n  return <div />\n}\n'
+
+  it('keeps react-in-jsx-scope quiet on a React 19 project', async () => {
+    const dir = await setupProject({ ...REACT_PROJECT, 'src/App.tsx': COMPONENT })
+
+    const report = await audit({ projectDir: dir, write: true })
+    const { stdout, stderr } = await run(['--config', '.oxlintrc.json', '.'], dir)
+
+    expect(report.recommendations.map(({ target }) => target)).toContain('react/react-in-jsx-scope')
+    expect(`${stdout}${stderr}`).not.toContain('react-in-jsx-scope')
+  })
+
+  it('still reports it on a React 16 project, whose runtime is classic', async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({ name: 'app', dependencies: { react: '^16.14.0' } }),
+      'src/App.tsx': COMPONENT,
+    })
+
+    const report = await audit({ projectDir: dir, write: true })
+    const { stdout, stderr } = await run(['--config', '.oxlintrc.json', '.'], dir)
+
+    expect(report.recommendations.map(({ target }) => target)).not.toContain(
+      'react/react-in-jsx-scope',
+    )
+    expect(`${stdout}${stderr}`).toContain('react-in-jsx-scope')
+  })
+
+  it('leaves a project that re-enabled the rule alone', async () => {
+    const dir = await setupProject({
+      ...REACT_PROJECT,
+      'src/App.tsx': COMPONENT,
+      '.oxlintrc.json': `${JSON.stringify({ rules: { 'react/react-in-jsx-scope': 'error' } })}\n`,
+    })
+
+    await audit({ projectDir: dir, write: true })
+    const written = JSON.parse(await readFile(join(dir, '.oxlintrc.json'), 'utf-8')) as {
+      rules: Record<string, string>
+    }
+
+    expect(written.rules['react/react-in-jsx-scope']).toBe('error')
   })
 })
 
@@ -542,7 +595,7 @@ describe('projects configured with a module config', () => {
 
     expect(report.blockers.join('\n')).toMatch(/oxlint\.config\.ts/u)
     expect(report.config.written).toBe(false)
-    await expect(readFile(join(dir, '.oxlintrc.json'), 'utf-8')).rejects.toThrow()
+    await expect(readFile(join(dir, '.oxlintrc.json'), 'utf-8')).rejects.toThrow(/ENOENT/u)
   })
 
   it('still reports what it would recommend', async () => {

@@ -43,7 +43,9 @@ export interface MergeResult {
  * 3. An explicit `off` is a decision, not a gap. It is reported but never overwritten.
  *
  * Together these mean a run can only ever add checks. That is what makes it safe to run
- * repeatedly against a config someone else maintains.
+ * repeatedly against a config someone else maintains. The one recommendation that reads as
+ * a removal - an `off` for a rule the evidence proves cannot apply - is written only into a
+ * gap, so it removes nothing the project put there.
  */
 export function mergeRecommendations(
   existingConfig: OxlintConfig,
@@ -187,6 +189,19 @@ function applyCategory(
 
 function applyRule(config: OxlintConfig, rule: string, severity: OxlintSeverity): ApplyOutcome {
   const existing = config.rules?.[rule]
+
+  // An `off` is recommended only on evidence that the rule cannot apply to the project.
+  // It fills a gap and never overrides: any explicit value, a re-enable included, is the
+  // project's decision and stands.
+  if (severity === 'off') {
+    if (existing !== undefined) {
+      return 'satisfied'
+    }
+
+    config.rules = { ...config.rules, [rule]: 'off' }
+
+    return 'applied'
+  }
 
   if (existing !== undefined) {
     const existingSeverity = toSeverity(existing)

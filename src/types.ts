@@ -165,6 +165,12 @@ export type StackSignalId =
   | 'stripe'
   | 'supabase'
   | 'vite'
+  /**
+   * The automatic JSX runtime: a `react` dependency whose range cannot resolve below 17,
+   * or Next.js, which compiles JSX that way unconditionally. Established so a rule that
+   * only makes sense under the classic runtime can be kept off on evidence.
+   */
+  | 'react-jsx-runtime'
   /** The audit plugin sources, as a dependency or a copy under `tools/`. */
   | 'audit-plugins'
   /** `@oxlint/plugins`, the runtime every js plugin imports. Without it none of them load. */
