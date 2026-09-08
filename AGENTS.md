@@ -26,7 +26,7 @@ other.
 ```bash
 pnpm check                                    # CLI: format, lint, typecheck, vitest
 cd plugins && pnpm install --ignore-workspace # first time only
-cd plugins && pnpm check                      # plugins: lint, typecheck, rule tests, fixtures, skill assets
+cd plugins && pnpm check                      # plugins: lint, typecheck, rule tests, build, fixtures
 ```
 
 `plugins/` is not a pnpm workspace member. It has its own lockfile and is installed with
@@ -104,9 +104,15 @@ that would change which inputs are accepted, or that need a decision, report wit
 rule's test asserts `meta.fixable` is unset where that applies. `plugins/README.md` records the
 reasoning per rule.
 
-**`plugins/fixtures/` is deliberately broken.** It is an end-to-end check that the plugins load
-and fire under a real `oxlint` run - `pnpm test:fixtures` fails if the fixtures stop producing
-findings. Do not "fix" it, and do not lint it with the root config (it is in `ignorePatterns`).
+**`plugins/fixtures/` is deliberately broken.** It is an end-to-end check that the shipped preset
+loads and every plugin in it fires under a real `oxlint` run - `pnpm test:fixtures` fails if any
+plugin stops producing findings, and reads the diagnostics rather than the exit code so a preset
+that fails to load cannot pass as one that found something. Do not "fix" it, and do not lint it
+with the root config (it is in `ignorePatterns`).
+
+**The install skill installs the package; it never copies sources.** The CLI still recognises a
+copy under `tools/oxlint/audit-plugins` that a project made by hand, and gates it on
+`@oxlint/plugins` being declared, because a copy carries no manifest to bring the runtime.
 
 ## Adding a rule to a plugin
 

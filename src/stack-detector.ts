@@ -90,8 +90,8 @@ const CONFIG_FILE_SIGNALS: Array<{ id: StackSignalId; files: string[] }> = [
   // `package.json#workspaces` is only one of several conventions; pnpm, Lerna and Nx each
   // declare a workspace somewhere else entirely.
   { id: 'monorepo', files: ['pnpm-workspace.yaml', 'pnpm-workspace.yml', 'lerna.json', 'nx.json'] },
-  // The install skill copies the plugins into the tree rather than adding a dependency,
-  // so a vendored copy has to count as the package being present.
+  // A copy of the plugin sources a project made by hand counts as the package being
+  // present; it carries no manifest, so the runtime is gated separately (`oxlint-plugins`).
   { id: 'audit-plugins', files: ['tools/oxlint/audit-plugins'] },
 ]
 
