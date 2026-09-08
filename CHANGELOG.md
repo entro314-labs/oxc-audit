@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-08
+
+### Added
+
+- A React 17+ or Next.js project's `recommended` config now writes `react/react-in-jsx-scope` as `off`, so component files are no longer reported for a `React` binding the automatic JSX runtime never uses. It only fills a gap: any value the project set for the rule, including a re-enable, is left alone. A new `react-jsx-runtime` signal records the evidence, and `--next` asserts it. ([cebfeec](https://github.com/entro314-labs/oxc-audit/commit/cebfeec))
+### Changed
+
+- The audit plugins are only ever used as the `@entro314labs/oxlint-audit-plugins` dependency. The install skill installs the package and either runs `oxc-audit --write` or registers the plugins by package subpath, instead of copying the TypeScript sources into `tools/oxlint/audit-plugins`. The CLI no longer recognises such a copy, the `oxlint-plugins` signal is gone, and the prerequisite always names the package. ([a393031](https://github.com/entro314-labs/oxc-audit/commit/a393031), [68ac56d](https://github.com/entro314-labs/oxc-audit/commit/68ac56d))
+- `compareVersions` and `minimumVersionOf` moved to their own module; both remain exported from the package root. ([cebfeec](https://github.com/entro314-labs/oxc-audit/commit/cebfeec))
+### Fixed
+
+- The shipped `oxlintrc.audit.json` preset pointed at `./src/<plugin>/index.ts` files the published package does not contain, so every `oxlint -c node_modules/@entro314labs/oxlint-audit-plugins/oxlintrc.audit.json` run failed to start. The preset now names the built `dist/` files, and the fixture check reads the run's diagnostics so a preset that fails to load can no longer pass. ([0f86840](https://github.com/entro314-labs/oxc-audit/commit/0f86840), [33572bc](https://github.com/entro314-labs/oxc-audit/commit/33572bc))
+- Five type-aware rules in Oxlint's `correctness` category were written at `warn` from `--strict`, overriding the `error` the category already gave them. They now sit at `recommended`/`error`, and every level is checked against Oxlint's rule listing so no recommendation can drop below its category's severity. ([2524e0f](https://github.com/entro314-labs/oxc-audit/commit/2524e0f))
+- A commented `.oxfmtrc.jsonc` blocked the formatter write only after the linter config and `package.json` scripts had been written, leaving the run half-applied with exit code 1. Both halves are planned before either is written, and one blocker stops all three. ([bdf2a0c](https://github.com/entro314-labs/oxc-audit/commit/bdf2a0c))
+- Biome's `arrowParentheses: "asNeeded"` and `quoteProperties: "asNeeded"` were carried into the oxfmt config unchanged, which oxfmt rejects. They are translated to `avoid` and `as-needed`; values with no oxfmt counterpart are left behind. ([8bb7de3](https://github.com/entro314-labs/oxc-audit/commit/8bb7de3))
+- A flow-style `packages: ["apps/*", "!apps/native"]` in `pnpm-workspace.yaml` was not read, so `--recurse` fell back to plain discovery and wrote config into the excluded package. The file is now parsed as YAML. ([6bf6c3e](https://github.com/entro314-labs/oxc-audit/commit/6bf6c3e))
+- `--dir` on a directory without its own `package.json` added the `lint` and `format` scripts to the closest parent manifest. Scripts are now written only to the audited directory's manifest, while dependency advice still comes from the closest manifest so the install command is not dropped. ([d6e7e0b](https://github.com/entro314-labs/oxc-audit/commit/d6e7e0b), [a3f50b4](https://github.com/entro314-labs/oxc-audit/commit/a3f50b4))
+- `@oxlint/plugins` was reported missing whenever custom plugins were configured, even when `@entro314labs/oxlint-audit-plugins`, which depends on it, was installed. ([d6e7e0b](https://github.com/entro314-labs/oxc-audit/commit/d6e7e0b))
+- Prerequisites ignored the request: `--basic` asked for `oxlint-tsgolint` it would never configure, and install commands always said `pnpm` regardless of the manifest's `packageManager`. Both now follow the level and the package manager. ([d6e7e0b](https://github.com/entro314-labs/oxc-audit/commit/d6e7e0b))
+- The `tsconfig.json` checks recognised Next.js from `next.config.ts` alone; every spelling the stack detector accepts, and the `--next` flag, now count. ([d6e7e0b](https://github.com/entro314-labs/oxc-audit/commit/d6e7e0b))
+- `--security` recommended both `react/no-danger` and `web-security/require-sanitized-html`, which the plugin package documents as one-or-the-other. The built-in rule stands down when the plugin is recommended. ([d6e7e0b](https://github.com/entro314-labs/oxc-audit/commit/d6e7e0b))
+- `--help` claimed `--paranoid` enables `restriction` and `style`; it never has. The README usage block no longer lists the removed `--format` flag, and the plugin README's `jsPlugins` example points at paths the package actually ships. ([e38a52b](https://github.com/entro314-labs/oxc-audit/commit/e38a52b))
+
 ## [1.4.0] - 2026-09-08
 
 `@entro314labs/oxlint-audit-plugins` 1.3.2 ships alongside: its preset fix below is the
@@ -151,7 +174,8 @@ Initial release.
   object forms), and `lerna.json` are read; with no declaration every package found on
   disk is audited as before.
 
-[Unreleased]: https://github.com/entro314-labs/oxc-audit/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/entro314-labs/oxc-audit/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/entro314-labs/oxc-audit/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.3...v1.4.0
 [1.3.3]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.1...v1.3.2
