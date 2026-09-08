@@ -28,7 +28,7 @@
 		"prepublishOnly": "pnpm check",
 		"sync:skill-assets": "node scripts/sync-skill-assets.mjs",
 		"test": "for f in src/*/rules/*.test.ts; do echo \"  $f\" && tsx \"$f\" || exit 1; done",
-		"test:fixtures": "oxlint -c oxlintrc.audit.json --deny-warnings fixtures > /dev/null 2>&1 && echo 'fixtures produced no findings — the integration fixture has regressed' && exit 1 || echo 'fixtures still trip the plugins'",
+		"test:fixtures": "node scripts/check-fixtures.mjs",
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
