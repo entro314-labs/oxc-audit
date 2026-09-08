@@ -232,7 +232,7 @@ Those invariants are asserted directly, over a matrix of existing configs, in
 A further set of signals exists only to decide which custom plugins apply, and each is
 established by its dependency alone: `zod`, `tanstack-query`, `zustand`, `react-hook-form`,
 `drizzle`, `ai-sdk`, `stripe`, `supabase`, and `vite`. `audit-plugins` marks the plugin
-package itself, as a dependency or as a copy under `tools/oxlint/audit-plugins`.
+package itself, as a dependency.
 
 Dependencies are read from `dependencies`, `devDependencies`, and `peerDependencies`, so a
 monorepo leaf package that inherits a framework is still detected.
@@ -444,17 +444,18 @@ All four are generated from the schemas the installed toolchain ships, never edi
 
 ### Releasing
 
-Bump the version in `package.json`, add the matching `## [x.y.z]` section to
-`CHANGELOG.md`, then:
+Bump the version in `package.json`, and in `plugins/package.json` when the plugins changed,
+then add the matching `## [x.y.z]` section to `CHANGELOG.md`:
 
 ```bash
-pnpm release --dry-run   # run every check and pack the tarball, changing nothing
+pnpm release --dry-run   # run every check and pack the tarballs, changing nothing
 pnpm release             # publish to npm, tag the version, open the GitHub release
 ```
 
-The release notes are the CHANGELOG section for that exact version. npm credentials,
-`gh` auth, an `origin` remote, and an unused tag are all verified before anything is
-published.
+Both packages are published from the one command, each only when its version is not on
+npm yet, so a CLI-only release leaves the plugin package alone. The release notes are the
+CHANGELOG section for the CLI version. npm credentials, `gh` auth, an `origin` remote, an
+installed `plugins/` tree, and an unused tag are all verified before anything is published.
 
 ## License
 

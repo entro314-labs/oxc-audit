@@ -120,8 +120,8 @@ function jsPluginName(entry: OxlintJsPlugin): string {
   }
 
   // The bare-string form takes its name from the plugin's own `meta.name`, which is not
-  // readable from here. The last path segment before `/index.ts` is the directory the
-  // plugin ships in, which is how this tool writes them and how the package lays them out.
+  // readable from here. The last segment, after any `/index.*` file, is the package
+  // subpath or directory the plugin ships in, which is how the package lays them out.
   const segments = entry.replace(/\/index\.[cm]?[jt]s$/u, '').split('/')
 
   return segments.at(-1) ?? entry

@@ -110,9 +110,9 @@ plugin stops producing findings, and reads the diagnostics rather than the exit 
 that fails to load cannot pass as one that found something. Do not "fix" it, and do not lint it
 with the root config (it is in `ignorePatterns`).
 
-**The install skill installs the package; it never copies sources.** The CLI still recognises a
-copy under `tools/oxlint/audit-plugins` that a project made by hand, and gates it on
-`@oxlint/plugins` being declared, because a copy carries no manifest to bring the runtime.
+**The plugins are only ever a dependency.** The install skill installs the package, and the CLI
+recognises the package alone: a copy of the sources in a project's tree carries no manifest to
+bring the runtime and joins the project's own compilation, so nothing here looks for one.
 
 ## Adding a rule to a plugin
 

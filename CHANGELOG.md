@@ -17,6 +17,9 @@ only change to that package.
   as `off` on that evidence - the one `off` this tool writes. It fills a gap only: a value the
   project set for the rule, a re-enable included, is left alone. The new `react-jsx-runtime`
   signal records the range or Next.js evidence behind it, and `--next` asserts it.
+- The CLI no longer recognises a copy of the plugin sources under `tools/oxlint/audit-plugins`,
+  and the `oxlint-plugins` signal that gated it is gone. The plugins are only ever a dependency,
+  and the install skill installs the package instead of copying its sources.
 - `compareVersions` and `minimumVersionOf` moved to their own module; both are still exported
   from the package root.
 

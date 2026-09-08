@@ -171,10 +171,8 @@ export type StackSignalId =
    * only makes sense under the classic runtime can be kept off on evidence.
    */
   | 'react-jsx-runtime'
-  /** The audit plugin sources, as a dependency or a copy under `tools/`. */
+  /** The audit plugin package, as a dependency. It carries the runtime the plugins import. */
   | 'audit-plugins'
-  /** `@oxlint/plugins`, the runtime every js plugin imports. Without it none of them load. */
-  | 'oxlint-plugins'
 
 export interface ProjectStack {
   projectDir: string

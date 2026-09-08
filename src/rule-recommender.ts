@@ -1046,37 +1046,13 @@ const AUDIT_PLUGINS: Array<{
 ]
 
 /**
- * Where the plugin package lives, read from the evidence that detected it.
- *
- * A vendored copy and an installed dependency need different `jsPlugins` paths, and
- * guessing wrong produces a config Oxlint cannot load.
+ * The `jsPlugins` specifier for a plugin: the package name, not a path. Oxlint resolves a
+ * bare specifier through the package's `exports` map, which is what keeps the config working
+ * when the package reorganises its files and under package managers that do not hoist into
+ * a flat `node_modules`. Reaching into `node_modules/...` would bypass both.
  */
-/** True when the plugins can actually be loaded: sources present, and a runtime to load them. */
-function hasAuditPluginRuntime(stack: ProjectStack): boolean {
-  if (!hasSignal(stack, 'audit-plugins')) {
-    return false
-  }
-
-  return !isVendoredPluginCopy(stack) || hasSignal(stack, 'oxlint-plugins')
-}
-
-/** True when the sources are a copy in the tree rather than an installed dependency. */
-function isVendoredPluginCopy(stack: ProjectStack): boolean {
-  const signal = stack.signals.find(({ id }) => id === 'audit-plugins')
-
-  return signal?.evidence.every(({ kind }) => kind === 'config-file') ?? false
-}
-
-function auditPluginSpecifier(stack: ProjectStack, plugin: string): string {
-  const vendored = isVendoredPluginCopy(stack)
-
-  // A dependency is named, not pathed. Oxlint resolves a bare specifier through the
-  // package's `exports` map, which is what keeps the config working when the package
-  // reorganises its files and under package managers that do not hoist into a flat
-  // `node_modules`. Reaching into `node_modules/.../src` would bypass both.
-  return vendored
-    ? `./tools/oxlint/audit-plugins/${plugin}/index.ts`
-    : `${AUDIT_PLUGINS_PACKAGE}/${plugin}`
+function auditPluginSpecifier(plugin: string): string {
+  return `${AUDIT_PLUGINS_PACKAGE}/${plugin}`
 }
 
 /** The level and domains a request resolves to. */
@@ -1152,12 +1128,10 @@ export function recommendForStack(
   const wanted = (entry: { level: AuditLevel; domains?: AuditDomain[] }): boolean =>
     isWanted(resolved, entry)
 
-  // The sources to point at, and the runtime they import. The published package declares
-  // `@oxlint/plugins` as a dependency, so installing it is enough; a copy vendored into the
-  // tree has no manifest to carry that, and needs the runtime declared separately. Getting
-  // this wrong either way is costly: a `jsPlugins` entry whose runtime is missing makes
+  // Gated on the package being a dependency: it declares `@oxlint/plugins`, the runtime every
+  // plugin imports, so installing it is enough, and a `jsPlugins` entry without it makes
   // Oxlint refuse to start.
-  const auditPlugins = hasAuditPluginRuntime(stack) ? selectAuditPlugins(stack, resolved) : []
+  const auditPlugins = hasSignal(stack, 'audit-plugins') ? selectAuditPlugins(stack, resolved) : []
   const auditPluginNames = new Set(auditPlugins.map(({ plugin }) => plugin))
 
   for (const { plugin, requires, reason } of PLUGIN_RULES) {
@@ -1244,7 +1218,7 @@ export function recommendForStack(
     recommendations.push({
       kind: 'js-plugin',
       target: plugin,
-      specifier: auditPluginSpecifier(stack, plugin),
+      specifier: auditPluginSpecifier(plugin),
       reason,
       triggeredBy,
     })
@@ -1290,7 +1264,7 @@ export function findPrerequisites(
     }
   }
 
-  if (!hasAuditPluginRuntime(stack)) {
+  if (!hasSignal(stack, 'audit-plugins')) {
     const applicable = selectAuditPlugins(stack, resolved).map(({ plugin }) => plugin)
 
     if (applicable.length > 0) {
@@ -1299,9 +1273,7 @@ export function findPrerequisites(
         // One install is enough: the package declares `@oxlint/plugins` as a dependency, so
         // the runtime every plugin imports arrives with it.
         reason: `This project's dependencies match ${applicable.length} of the audit plugins, which catch deprecated APIs and migration residue that still type-checks and still runs.`,
-        install: installCommand(stack.packageManager, [
-          hasSignal(stack, 'audit-plugins') ? '@oxlint/plugins' : AUDIT_PLUGINS_PACKAGE,
-        ]),
+        install: installCommand(stack.packageManager, [AUDIT_PLUGINS_PACKAGE]),
       })
     }
   }

@@ -90,9 +90,6 @@ const CONFIG_FILE_SIGNALS: Array<{ id: StackSignalId; files: string[] }> = [
   // `package.json#workspaces` is only one of several conventions; pnpm, Lerna and Nx each
   // declare a workspace somewhere else entirely.
   { id: 'monorepo', files: ['pnpm-workspace.yaml', 'pnpm-workspace.yml', 'lerna.json', 'nx.json'] },
-  // A copy of the plugin sources a project made by hand counts as the package being
-  // present; it carries no manifest, so the runtime is gated separately (`oxlint-plugins`).
-  { id: 'audit-plugins', files: ['tools/oxlint/audit-plugins'] },
 ]
 
 /** Dependency names that establish a signal, matched exactly. */
@@ -123,12 +120,10 @@ const DEPENDENCY_SIGNALS: Array<{ id: StackSignalId; packages: string[] }> = [
     packages: ['@supabase/supabase-js', '@supabase/ssr', '@supabase/server'],
   },
   { id: 'vite', packages: ['vite'] },
-  // Supplies the js plugins. Without it a `jsPlugins` entry names a file that does not
-  // exist and Oxlint refuses to start, so its presence gates those recommendations.
+  // Supplies the js plugins and, as its dependency, the `@oxlint/plugins` runtime they
+  // import. Without it a `jsPlugins` entry names a package that does not exist and Oxlint
+  // refuses to start, so its presence gates those recommendations.
   { id: 'audit-plugins', packages: [AUDIT_PLUGINS_PACKAGE] },
-  // Every js plugin imports `@oxlint/plugins`. Without it Oxlint fails to load the plugin
-  // and refuses to start, so a `jsPlugins` entry is only safe once this is present.
-  { id: 'oxlint-plugins', packages: ['@oxlint/plugins'] },
 ]
 
 /** Extensions that establish a signal by their presence in the source tree. */
