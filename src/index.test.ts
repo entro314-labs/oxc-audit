@@ -209,7 +209,10 @@ describe('audit', () => {
     const report = await audit({ projectDir: join(parent, 'sub'), write: true })
 
     expect(report.success).toBe(true)
-    expect(report.packageUpdate).toBeUndefined()
+    // The dependency advice still comes from the manifest an install would land in.
+    expect(report.packageUpdate?.scriptsAdded).toEqual([])
+    expect(report.packageUpdate?.written).toBe(false)
+    expect(report.packageUpdate?.missingDependencies).toEqual(['oxlint', 'oxfmt'])
     expect(await pathExists(join(parent, 'sub', '.oxlintrc.json'))).toBe(true)
     expect(JSON.parse(await readFile(join(parent, 'package.json'), 'utf-8'))).not.toHaveProperty(
       'scripts',

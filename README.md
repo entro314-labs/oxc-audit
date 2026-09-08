@@ -90,8 +90,8 @@ Oxlint's own categories, so they mean here what they mean in a hand-written conf
 | Level                       | Categories             | Type-aware rules                          | Findings on a clean codebase |
 | --------------------------- | ---------------------- | ----------------------------------------- | ---------------------------- |
 | `--basic`                   | `correctness`          | none                                      | 0                            |
-| `--recommended` _(default)_ | `+ suspicious`         | the ~27 that find unsound code            | ~38                          |
-| `--strict`                  | `+ pedantic`, `+ perf` | `+ ~27` that reject a lot of working code | ~341                         |
+| `--recommended` _(default)_ | `+ suspicious`         | the 32 that find unsound code             | ~38                          |
+| `--strict`                  | `+ pedantic`, `+ perf` | `+ 22` that reject a lot of working code  | ~341                         |
 | `--paranoid`                | same as strict         | `+ 5` whole-codebase policies             | ~350                         |
 
 The last column was measured against this repository, which passes its own lint. `paranoid`

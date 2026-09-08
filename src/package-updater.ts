@@ -1,8 +1,12 @@
-import { join } from 'node:path'
+import { dirname, resolve } from 'node:path'
 
 import { z } from 'zod'
 
-import { pathExists, readJsonFilePreservingKeyOrder, writeTextFileAtomically } from './fs-utils.js'
+import {
+  findClosestPackageJson,
+  readJsonFilePreservingKeyOrder,
+  writeTextFileAtomically,
+} from './fs-utils.js'
 import { AUDIT_PLUGINS_PACKAGE } from './stack-detector.js'
 import type { PackageUpdate, Reporter } from './types.js'
 
@@ -84,9 +88,11 @@ export function installCommand(packageManager: string | undefined, packages: str
  * manager is a side effect well beyond writing a config file, and the lockfile is the
  * project's to change.
  *
- * Only the manifest in the audited directory is touched. A parent's manifest is outside
- * the directory the user named and outside the lock this run holds, and a `lint` script
- * there would run against a tree the config written here does not cover.
+ * Dependencies are read from the closest manifest, which is the one the stack detector read
+ * and the one an install would land in. Scripts are written only when that manifest is the
+ * audited directory's own: a parent's manifest is outside the directory the user named and
+ * outside the lock this run holds, and a `lint` script there would run against a tree the
+ * config written here does not cover.
  */
 export async function updatePackageJson(
   projectDir: string,
@@ -99,11 +105,13 @@ export async function updatePackageJson(
     signal?: AbortSignal
   },
 ): Promise<PackageUpdate | undefined> {
-  const packageJsonPath = join(projectDir, 'package.json')
+  const packageJsonPath = await findClosestPackageJson(projectDir)
 
-  if (!(await pathExists(packageJsonPath))) {
+  if (!packageJsonPath) {
     return undefined
   }
+
+  const ownManifest = dirname(packageJsonPath) === resolve(projectDir)
 
   let manifest: PackageJson
   try {
@@ -124,6 +132,10 @@ export async function updatePackageJson(
   const scriptsAdded: string[] = []
 
   for (const { name, command } of SCRIPTS) {
+    if (!ownManifest) {
+      break
+    }
+
     if (name === 'format' || name === 'format:check') {
       if (!options.format) {
         continue

@@ -410,6 +410,9 @@ describe('recommendations never weaken a rule its category already enables', () 
 
   it.each(requests)('holds at %o', async (request) => {
     const categories = await readRuleCategories()
+    // The listing has to cover the base plugins too, or their targeted rules go unchecked.
+    expect(categories.get('unicorn/prefer-set-has')).toBe('perf')
+    expect(categories.get('oxc/no-accumulating-spread')).toBe('perf')
     const recommendations = recommendForStack(stack, request)
     const categorySeverity = new Map<string, keyof typeof SEVERITY_RANK>()
 
