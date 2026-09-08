@@ -242,4 +242,22 @@ describe('audit plugin conformance', () => {
         .sort(),
     ).toEqual(exported.sort())
   })
+
+  // The preset ships in the package and names its plugins by relative path, so every path
+  // has to resolve inside the published tarball. A path into an unpublished directory makes
+  // `oxlint -c node_modules/.../oxlintrc.audit.json` fail to start for every consumer.
+  it('ships a preset whose plugin paths are the files the package publishes', async () => {
+    const manifest = JSON.parse(
+      await readFile(join(process.cwd(), 'plugins', 'package.json'), 'utf-8'),
+    ) as { files: string[]; exports: Record<string, string> }
+    const preset = JSON.parse(
+      await readFile(join(process.cwd(), 'plugins', 'oxlintrc.audit.json'), 'utf-8'),
+    ) as { jsPlugins: string[] }
+
+    expect([...preset.jsPlugins].sort()).toEqual(Object.values(manifest.exports).sort())
+    for (const specifier of preset.jsPlugins) {
+      const topLevelDir = specifier.replace('./', '').split('/')[0] ?? ''
+      expect(manifest.files).toContain(topLevelDir)
+    }
+  })
 })

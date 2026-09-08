@@ -2,13 +2,13 @@
   "$schema": "./node_modules/oxlint/configuration_schema.json",
 
   "jsPlugins": [
-    "./src/next-react/index.ts",
-    "./src/data-layer/index.ts",
-    "./src/ai-integrations/index.ts",
-    "./src/ts-tooling/index.ts",
-    "./src/slop-stop/index.ts",
-    "./src/supabase/index.ts",
-    "./src/web-security/index.ts"
+    "./dist/next-react/index.mjs",
+    "./dist/data-layer/index.mjs",
+    "./dist/ai-integrations/index.mjs",
+    "./dist/ts-tooling/index.mjs",
+    "./dist/slop-stop/index.mjs",
+    "./dist/supabase/index.mjs",
+    "./dist/web-security/index.mjs"
   ],
 
   "plugins": ["typescript", "promise", "import", "unicorn", "vitest", "oxc", "react", "nextjs"],
