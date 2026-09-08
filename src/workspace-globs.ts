@@ -1,6 +1,8 @@
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 
+import { parse as parseYaml } from 'yaml'
+
 import { isPathNotFoundError } from './fs-utils.js'
 
 export interface WorkspaceDeclaration {
@@ -93,12 +95,13 @@ async function readJsonWorkspace(
 }
 
 /**
- * Extracts the `packages:` list from `pnpm-workspace.yaml`.
+ * Reads the `packages:` list from `pnpm-workspace.yaml`.
  *
- * A targeted reader rather than a YAML parser: the field is a top-level key holding a flat
- * sequence of strings, which is a small enough shape to read exactly, and pulling in a
- * YAML dependency to read one list would be disproportionate. Anything it cannot make
- * sense of yields `undefined`, and the caller falls back to plain discovery.
+ * Parsed as YAML rather than pattern-matched line by line: pnpm accepts every YAML spelling
+ * of a sequence, and a flow-style `packages: ["apps/*", "!apps/native"]` that a line reader
+ * could not follow would silently drop the exclusion - and with it the one guarantee this
+ * declaration exists to provide. A file that does not parse, or has no `packages` list,
+ * yields `undefined` and the caller falls back to plain discovery.
  */
 async function readPnpmWorkspace(rootDir: string): Promise<WorkspaceDeclaration | undefined> {
   for (const fileName of ['pnpm-workspace.yaml', 'pnpm-workspace.yml']) {
@@ -108,35 +111,27 @@ async function readPnpmWorkspace(rootDir: string): Promise<WorkspaceDeclaration 
       continue
     }
 
-    const globs: string[] = []
-    let insidePackages = false
-
-    for (const rawLine of content.split(/\r?\n/u)) {
-      const line = stripComment(rawLine)
-
-      if (/^packages:\s*$/u.test(line)) {
-        insidePackages = true
-        continue
-      }
-
-      if (!insidePackages) {
-        continue
-      }
-
-      const item = /^\s+-\s*(.+)$/u.exec(line)
-
-      if (item?.[1]) {
-        globs.push(unquote(item[1].trim()))
-        continue
-      }
-
-      // A non-indented, non-empty line ends the sequence.
-      if (line.trim().length > 0 && !/^\s/u.test(line)) {
-        break
-      }
+    let parsed: unknown
+    try {
+      parsed = parseYaml(content)
+    } catch {
+      continue
     }
 
-    const declaration = toDeclaration(fileName, globs)
+    if (typeof parsed !== 'object' || parsed === null || !('packages' in parsed)) {
+      continue
+    }
+
+    const { packages } = parsed
+
+    if (!Array.isArray(packages)) {
+      continue
+    }
+
+    const declaration = toDeclaration(
+      fileName,
+      packages.filter((glob): glob is string => typeof glob === 'string'),
+    )
 
     if (declaration) {
       return declaration
@@ -144,32 +139,6 @@ async function readPnpmWorkspace(rootDir: string): Promise<WorkspaceDeclaration 
   }
 
   return undefined
-}
-
-/** Removes a trailing `#` comment, ignoring `#` inside quotes. */
-function stripComment(line: string): string {
-  let inSingle = false
-  let inDouble = false
-
-  for (let index = 0; index < line.length; index++) {
-    const char = line[index]
-
-    if (char === "'" && !inDouble) {
-      inSingle = !inSingle
-    } else if (char === '"' && !inSingle) {
-      inDouble = !inDouble
-    } else if (char === '#' && !inSingle && !inDouble) {
-      return line.slice(0, index)
-    }
-  }
-
-  return line
-}
-
-function unquote(value: string): string {
-  const quoted = /^(['"])(.*)\1$/u.exec(value)
-
-  return quoted?.[2] ?? value
 }
 
 /** True when a package path is selected by the declaration. */

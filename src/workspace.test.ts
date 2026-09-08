@@ -247,6 +247,28 @@ describe('workspace declarations are honoured', () => {
     expect(discovery.declaredIn).toBeDefined()
   })
 
+  // pnpm reads every YAML spelling of the list. A flow-style sequence carries the same
+  // exclusion, and dropping it would write config into the one package the repo set apart.
+  it('honours a flow-style pnpm declaration, exclusion included', async () => {
+    const dir = await setupWorkspace({
+      ...WITH_EXCLUSION,
+      'pnpm-workspace.yaml': 'packages: ["apps/*", "!apps/native", "packages/*"] # flow style\n',
+    })
+
+    const discovery = await discoverWorkspace(dir)
+
+    expect(discovery.packages.map((entry) => entry.relativeDir)).toEqual([
+      'apps/web',
+      'packages/ui',
+    ])
+    expect(discovery.excluded.map((entry) => entry.relativeDir)).toContain('apps/native')
+
+    await auditWorkspace({ projectDir: dir, write: true }, new CollectingReporter())
+
+    expect(await pathExists(join(dir, 'apps/native/.oxlintrc.json'))).toBe(false)
+    expect(await pathExists(join(dir, 'apps/native/.oxfmtrc.jsonc'))).toBe(false)
+  })
+
   it('honours package.json workspaces, including the object form', async () => {
     const dir = await setupWorkspace({
       'package.json': JSON.stringify({ name: 'root', workspaces: { packages: ['packages/*'] } }),
