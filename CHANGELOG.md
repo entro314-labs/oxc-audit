@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-08
+
+`@entro314labs/oxlint-audit-plugins` 1.3.2 ships alongside: its preset fix below is the
+only change to that package.
+
 ### Changed
 
 - A React 17+ or Next.js project's `recommended` config no longer reports every component
@@ -143,7 +148,8 @@ Initial release.
   object forms), and `lerna.json` are read; with no declaration every package found on
   disk is audited as before.
 
-[Unreleased]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.3...HEAD
+[Unreleased]: https://github.com/entro314-labs/oxc-audit/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.3...v1.4.0
 [1.3.3]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/entro314-labs/oxc-audit/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/entro314-labs/oxc-audit/compare/v1.0.0...v1.3.1
