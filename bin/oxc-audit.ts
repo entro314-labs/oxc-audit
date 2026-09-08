@@ -225,7 +225,7 @@ const LEVEL_HELP: Record<AuditLevel, string> = {
   basic: 'Correctness only - the smallest config that still catches real bugs',
   recommended: 'Correctness and suspicious, plus the targeted rules (default)',
   strict: 'Also pedantic and perf, and the type-aware rules that reject working code',
-  paranoid: 'Also restriction and style, and the whole-codebase policies',
+  paranoid: 'Also the whole-codebase type-aware policies; no further categories',
 }
 
 /**

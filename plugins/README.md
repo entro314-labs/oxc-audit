@@ -5,18 +5,18 @@ Oxlint rules extracted from the version-locked stack audit prompts in
 mechanically-detectable half of those checklists is what lives here, so the same findings
 surface in the editor and in CI instead of only during a review pass.
 
-Five independent plugins, each loadable on its own so a project only pays for the stacks it
+Seven independent plugins, each loadable on its own so a project only pays for the stacks it
 actually uses:
 
-| Plugin | Entry point | Covers |
+| Plugin | Specifier | Covers |
 | --- | --- | --- |
-| `next-react` | `./src/next-react/index.ts` | Next.js 16 / React 19 migration residue |
-| `data-layer` | `./src/data-layer/index.ts` | Zod 4, TanStack Query 5, Zustand 5, RHF 7, Drizzle 1.0 |
-| `ai-integrations` | `./src/ai-integrations/index.ts` | AI SDK v6 -> v7, Stripe webhooks and v22 |
-| `ts-tooling` | `./src/ts-tooling/index.ts` | Vitest 4, Vite 8 config |
-| `slop-stop` | `./src/slop-stop/index.ts` | Type-evidence laundering; stack-independent |
-| `supabase` | `./src/supabase/index.ts` | Supabase auth, client boundaries, error envelopes |
-| `web-security` | `./src/web-security/index.ts` | OWASP Top 10:2025; stack-independent |
+| `next-react` | `@entro314labs/oxlint-audit-plugins/next-react` | Next.js 16 / React 19 migration residue |
+| `data-layer` | `@entro314labs/oxlint-audit-plugins/data-layer` | Zod 4, TanStack Query 5, Zustand 5, RHF 7, Drizzle 1.0 |
+| `ai-integrations` | `@entro314labs/oxlint-audit-plugins/ai-integrations` | AI SDK v6 -> v7, Stripe webhooks and v22 |
+| `ts-tooling` | `@entro314labs/oxlint-audit-plugins/ts-tooling` | Vitest 4, Vite 8 config |
+| `slop-stop` | `@entro314labs/oxlint-audit-plugins/slop-stop` | Type-evidence laundering; stack-independent |
+| `supabase` | `@entro314labs/oxlint-audit-plugins/supabase` | Supabase auth, client boundaries, error envelopes |
+| `web-security` | `@entro314labs/oxlint-audit-plugins/web-security` | OWASP Top 10:2025; stack-independent |
 
 ## What these rules are for
 
@@ -35,8 +35,8 @@ the residue a partly-applied codemod leaves behind.
 // .oxlintrc.json
 {
   "jsPlugins": [
-    "./node_modules/@entro314labs/oxlint-audit-plugins/src/data-layer/index.ts",
-    "./node_modules/@entro314labs/oxlint-audit-plugins/src/next-react/index.ts"
+    "@entro314labs/oxlint-audit-plugins/data-layer",
+    "@entro314labs/oxlint-audit-plugins/next-react"
   ],
   "rules": {
     "data-layer/no-zod-string-format-methods": "warn",

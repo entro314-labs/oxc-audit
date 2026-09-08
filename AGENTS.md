@@ -8,10 +8,10 @@ Two things that ship separately and are installed separately.
 and configures the Oxc toolchain around it. Published to npm.
 
 **`@entro314labs/oxlint-audit-plugins`** - seven custom Oxlint plugins, in [plugins/](plugins/). Loaded through
-`jsPlugins`. Currently `private`, distributed by copying via its install skill.
+`jsPlugins` by package name. Published to npm as compiled JavaScript.
 
 The CLI covers the whole Oxc toolchain, not just the linter: `oxlint` rules, the type-aware
-`tsgolint` rules, the custom plugins, and - behind `--format` - the `oxfmt` config. Each has a
+`tsgolint` rules, the custom plugins, and - unless `--no-format` - the `oxfmt` config. Each has a
 tracked inventory under `docs/` that the recommender is checked against.
 
 The CLI knows about the plugins: when it detects both a covered stack and the plugin package, it

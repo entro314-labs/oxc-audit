@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- The shipped `oxlintrc.audit.json` preset named `./src/<plugin>/index.ts`, which the
+  published package does not contain, so every documented `oxlint -c node_modules/.../oxlintrc.audit.json`
+  run failed to start. It now names the built `dist/` files the package exports, and the
+  fixture check reads the run's diagnostics instead of its exit code, so a preset that fails
+  to load can no longer pass as one that found something.
+- Five type-aware rules that sit in Oxlint's `correctness` category were recommended at
+  `warn` from `--strict`. The category is on at `error` from `--basic`, so naming them at
+  `warn` weakened a check that was already running. They now sit at `recommended`/`error`,
+  and every level is checked against Oxlint's own rule listing so no recommendation can fall
+  below the severity its category already gives it.
+- A commented `.oxfmtrc.jsonc` blocked the formatter write only after the linter config and
+  the `package.json` scripts had been written, leaving the run half-applied with exit code 1.
+  Both halves are now planned before either is written, and one blocker stops all three.
+- Biome's `arrowParentheses: "asNeeded"` and `quoteProperties: "asNeeded"` were carried into
+  the oxfmt config unchanged, which oxfmt rejects outright. They are translated to `avoid` and
+  `as-needed`.
+- A flow-style `packages: ["apps/*", "!apps/native"]` in `pnpm-workspace.yaml` was not read,
+  so `--recurse` fell back to plain discovery and wrote config into the excluded package.
+- `--dir` on a directory with no `package.json` added the `lint` and `format` scripts to the
+  closest parent manifest, outside the audited directory. Only the audited directory's own
+  manifest is touched.
+- `@oxlint/plugins` was reported as missing whenever custom plugins were configured, even when
+  `@entro314labs/oxlint-audit-plugins` - which depends on it - was installed.
+- Prerequisites ignored the level: `--basic` asked for `oxlint-tsgolint` it would never
+  configure, and install commands always said `pnpm` regardless of the manifest's
+  `packageManager`.
+- The `tsconfig.json` checks recognised Next.js from `next.config.ts` alone; every spelling the
+  stack detector accepts, and a `--next` flag, now count.
+- `--security` recommended both `react/no-danger` and `web-security/require-sanitized-html`,
+  which the plugin package documents as one-or-the-other. The built-in rule stands down when
+  the plugin is recommended.
+- `--help` claimed `--paranoid` enables `restriction` and `style`; it never has.
+
 ## [1.3.3] - 2026-09-03
 
 ### Fixed

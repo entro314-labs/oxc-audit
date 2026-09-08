@@ -321,8 +321,9 @@ Options:
   --max-files <count>  Maximum source files to scan before truncating
   -r, --recurse        Also audit every package found beneath the directory
   --max-depth <depth>  Directory depth to search for workspace packages
-  --format             Also write an oxfmt formatter config beside the linter
+  --no-format          Skip the oxfmt formatter config; write only the linter
                        config
+  --no-scripts         Skip adding lint and format scripts to package.json
   --json               Print the audit report as JSON to stdout
   -v, --verbose        Show detailed progress information
   --basic              Correctness only - the smallest config that still catches
@@ -331,8 +332,8 @@ Options:
                        (default)
   --strict             Also pedantic and perf, and the type-aware rules that
                        reject working code
-  --paranoid           Also restriction and style, and the whole-codebase
-                       policies
+  --paranoid           Also the whole-codebase type-aware policies; no further
+                       categories
   --security           Enable the security rule set regardless of the level
   --performance        Enable the performance rule set regardless of the level
   --accessibility      Enable the accessibility rule set regardless of the level
@@ -428,7 +429,7 @@ no longer exists.
 | `oxlint-rules.tsv`       | Every rule Oxlint ships, with its plugin                         | No recommended rule or plugin is invented                                                              |
 | `tsgolint-rules.tsv`     | Every tsgolint rule, with implementation status                  | No type-aware rule is recommended before tsgolint implements it                                        |
 | `oxlint-vs-tsgolint.tsv` | Every `typescript/*` rule, and whether it needs type information | No type-aware rule is recommended outside the tsgolint gate, where it would be accepted and never fire |
-| `oxfmt-rules.tsv`        | The oxfmt configuration surface                                  | Reference only - this tool does not write formatter config                                             |
+| `oxfmt-rules.tsv`        | The oxfmt configuration surface                                  | No formatter key is written that oxfmt does not accept                                                 |
 
 All four are generated from the schemas the installed toolchain ships, never edited by hand.
 `pnpm docs:sync` rewrites them after a toolchain upgrade, and `pnpm docs:check` runs inside
