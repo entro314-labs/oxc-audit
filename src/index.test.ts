@@ -140,6 +140,42 @@ describe('audit', () => {
     expect(await readFile(join(dir, '.oxlintrc.json'), 'utf-8')).toContain('// keep this note')
   })
 
+  // The two halves are written under one decision. A blocker found on the formatter side
+  // has to stop the linter write as well, otherwise the run half-finishes: config changed,
+  // scripts added, exit code 1.
+  it('writes nothing at all when the formatter config would lose comments', async () => {
+    const dir = await setupProject({
+      ...REACT_PROJECT,
+      '.oxfmtrc.jsonc': '{\n  // house style\n  "semi": false\n}\n',
+    })
+
+    const report = await audit({ projectDir: dir, write: true })
+
+    expect(report.success).toBe(false)
+    expect(report.blockers.some((blocker) => blocker.includes('.oxfmtrc.jsonc'))).toBe(true)
+    expect(report.config.written).toBe(false)
+    expect(report.format?.written).toBe(false)
+    expect(report.packageUpdate?.written).toBe(false)
+    expect(await pathExists(join(dir, '.oxlintrc.json'))).toBe(false)
+    expect(JSON.parse(await readFile(join(dir, 'package.json'), 'utf-8'))).not.toHaveProperty(
+      'scripts',
+    )
+  })
+
+  it('lets a commented formatter config that needs nothing block nothing', async () => {
+    const dir = await setupProject({
+      ...REACT_PROJECT,
+      '.oxfmtrc.jsonc':
+        '{\n  // already complete\n  "sortImports": {},\n  "sortPackageJson": true\n}\n',
+    })
+
+    const report = await audit({ projectDir: dir, write: true })
+
+    expect(report.success).toBe(true)
+    expect(report.config.written).toBe(true)
+    expect(report.format?.added).toEqual([])
+  })
+
   it('still reports on a commented config when not writing', async () => {
     const dir = await setupProject({
       ...REACT_PROJECT,

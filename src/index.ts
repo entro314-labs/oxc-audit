@@ -10,6 +10,7 @@ import {
   mergeFormatterConfig,
   OXFMT_CONFIG_NAMES,
 } from './format-config-loader.js'
+import type { LoadedOxfmtConfig } from './format-config-loader.js'
 import { recommendFormatterConfig } from './format-recommender.js'
 import { copyFileIfExists, pathExists, writeTextFileAtomically } from './fs-utils.js'
 import {
@@ -30,6 +31,7 @@ import type {
   AuditRequest,
   FormatConfigReport,
   AuditReport,
+  OxfmtConfig,
   ProjectStack,
   Reporter,
   WorkspaceAuditReport,
@@ -143,6 +145,14 @@ async function runAudit(
     reporter.blocker(`Merged configuration would be invalid: ${problem}`)
   }
 
+  // The formatter half is planned before anything is written, so a blocker on either half
+  // is known before the first write and suppresses both. A run that cannot finish one half
+  // must not half-finish the other.
+  const formatPlan =
+    options.format !== false
+      ? await planFormatterConfig(projectDir, stack, reporter, options)
+      : undefined
+
   const blocked = reporter.getBlockers().length > 0
   let written = false
 
@@ -173,10 +183,9 @@ async function runAudit(
     reporter.info('Configuration already satisfies every recommendation; nothing to write.')
   }
 
-  const format =
-    options.format !== false
-      ? await applyFormatterConfig(projectDir, stack, reporter, options, blocked)
-      : undefined
+  const format = formatPlan
+    ? await writeFormatterConfig(formatPlan, reporter, options, blocked)
+    : undefined
 
   const packageUpdate = options.noScripts
     ? undefined
@@ -210,21 +219,31 @@ async function runAudit(
   }
 }
 
+/** The formatter half of a run, worked out before any file is touched. */
+interface FormatterPlan {
+  path: string
+  /** Undefined when the existing file could not be read; the error is already reported. */
+  loaded: LoadedOxfmtConfig | undefined
+  config: OxfmtConfig
+  added: string[]
+  carriedFrom: 'prettier' | 'biome' | undefined
+}
+
 /**
- * Write the formatter half of the toolchain config.
+ * Plan the formatter half of the toolchain config: what exists, what would be added, and
+ * whether writing it is possible at all.
  *
- * Kept separate from the linter path on purpose: a formatter config that cannot be written
- * must not stop the linter recommendations from being applied, and vice versa. Blockers
- * raised against the Oxlint config suppress this too, because a run that could not finish
- * one half should not half-finish the other.
+ * Kept separate from the linter plan on purpose, so a formatter config that cannot be read
+ * does not stop the linter recommendations from being reported, and vice versa. The one
+ * thing shared is the blocker list: a comment in this file is raised here, before either
+ * half is written, so the linter write sees it too.
  */
-async function applyFormatterConfig(
+async function planFormatterConfig(
   projectDir: string,
   stack: ProjectStack,
   reporter: Reporter,
   options: AuditOptions,
-  blocked: boolean,
-): Promise<FormatConfigReport> {
+): Promise<FormatterPlan> {
   const configPath =
     (await findOxfmtConfig(projectDir)) ?? resolve(projectDir, OXFMT_CONFIG_NAMES[0] ?? '')
 
@@ -233,7 +252,7 @@ async function applyFormatterConfig(
     loaded = await loadOxfmtConfig(configPath)
   } catch (err) {
     reporter.error(err instanceof Error ? err.message : String(err))
-    return { path: configPath, existed: false, written: false, added: [], carriedFrom: undefined }
+    return { path: configPath, loaded: undefined, config: {}, added: [], carriedFrom: undefined }
   }
 
   const existingFormatter = loaded.existed
@@ -251,44 +270,50 @@ async function applyFormatterConfig(
     recommendFormatterConfig(stack, existingFormatter),
   )
 
+  // Rewriting drops comments. Raised only when there is something to write: a commented
+  // config that already carries every setting is left alone and blocks nothing.
+  if (options.write && added.length > 0 && containsComments(loaded.originalText)) {
+    reporter.blocker(
+      `${configPath} contains comments, which would be lost when the file is rewritten. Apply the formatter settings by hand, or strip the comments first.`,
+    )
+  }
+
+  return { path: configPath, loaded, config, added, carriedFrom: existingFormatter?.source }
+}
+
+async function writeFormatterConfig(
+  plan: FormatterPlan,
+  reporter: Reporter,
+  options: AuditOptions,
+  blocked: boolean,
+): Promise<FormatConfigReport> {
+  const { path: configPath, loaded, config, added, carriedFrom } = plan
   let written = false
 
-  if (options.write && added.length > 0 && !blocked) {
-    if (containsComments(loaded.originalText)) {
-      reporter.blocker(
-        `${configPath} contains comments, which would be lost when the file is rewritten. Apply the formatter settings by hand, or strip the comments first.`,
-      )
-    } else {
-      try {
-        if (!options.noBackup && loaded.existed) {
-          await copyFileIfExists(configPath, `${configPath}.backup`, options.signal)
-        }
-
-        await writeTextFileAtomically(configPath, `${JSON.stringify(config, null, 2)}\n`, {
-          ensureDirectory: true,
-          signal: options.signal,
-        })
-        written = true
-        reporter.info(`Wrote ${added.length} formatter setting(s) to ${configPath}`)
-      } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
-          throw err
-        }
-
-        reporter.error(
-          `Failed to write ${configPath}: ${err instanceof Error ? err.message : String(err)}`,
-        )
+  if (loaded && options.write && added.length > 0 && !blocked) {
+    try {
+      if (!options.noBackup && loaded.existed) {
+        await copyFileIfExists(configPath, `${configPath}.backup`, options.signal)
       }
+
+      await writeTextFileAtomically(configPath, `${JSON.stringify(config, null, 2)}\n`, {
+        ensureDirectory: true,
+        signal: options.signal,
+      })
+      written = true
+      reporter.info(`Wrote ${added.length} formatter setting(s) to ${configPath}`)
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') {
+        throw err
+      }
+
+      reporter.error(
+        `Failed to write ${configPath}: ${err instanceof Error ? err.message : String(err)}`,
+      )
     }
   }
 
-  return {
-    path: configPath,
-    existed: loaded.existed,
-    written,
-    added,
-    carriedFrom: existingFormatter?.source,
-  }
+  return { path: configPath, existed: loaded?.existed ?? false, written, added, carriedFrom }
 }
 
 /**
