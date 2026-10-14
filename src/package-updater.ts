@@ -16,7 +16,7 @@ const PackageJsonSchema = z
     dependencies: z.record(z.string(), z.string()).optional(),
     devDependencies: z.record(z.string(), z.string()).optional(),
   })
-  .passthrough()
+  .loose()
 
 type PackageJson = z.infer<typeof PackageJsonSchema>
 
