@@ -11,6 +11,7 @@ import { audit } from './index.js'
 import {
   getRecommendablePlugins,
   getRecommendableRuleNames,
+  getTypeAwareRuleNames,
   recommendForStack,
 } from './rule-recommender.js'
 import type { AuditRequest, ProjectStack } from './types.js'
@@ -540,6 +541,39 @@ describe('recommendations never weaken a rule its category already enables', () 
     const nursery = getRecommendableRuleNames().filter((rule) => categories.get(rule) === 'nursery')
 
     expect(nursery).toEqual([])
+  })
+
+  it('lists every rule at the level where its category starts running it', async () => {
+    const categories = await readRuleCategories()
+    const levels = ['basic', 'recommended', 'strict', 'paranoid'] as const
+    const at = levels.map((level) =>
+      recommendForStack(stack, { level, domains: [], maximal: false, forcedSignals: [] }),
+    )
+    const firstLevel = (found: (entries: (typeof at)[number]) => boolean): number =>
+      at.findIndex(found)
+
+    const early = getRecommendableRuleNames().flatMap((rule) => {
+      const named = firstLevel((entries) =>
+        entries.some(
+          ({ target, severity, files }) => target === rule && severity !== 'off' && !files,
+        ),
+      )
+      const category = categories.get(rule)
+      // A type-aware rule runs only once a level turns `typeAware` on.
+      const running = firstLevel(
+        (entries) =>
+          entries.some(({ kind, target }) => kind === 'category' && target === category) &&
+          (!rule.startsWith('typescript/') ||
+            !getTypeAwareRuleNames().includes(rule) ||
+            entries.some(({ kind, target }) => kind === 'option' && target === 'typeAware')),
+      )
+
+      return named !== -1 && running !== -1 && running < named
+        ? [`${rule}: named at ${levels[named]}, runs from ${levels[running]} (${category})`]
+        : []
+    })
+
+    expect(early).toEqual([])
   })
 
   it.each(requests)('holds at %o', async (request) => {

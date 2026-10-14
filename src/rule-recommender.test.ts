@@ -385,12 +385,7 @@ describe('the level ladder', () => {
     expect(typeAwareCount('basic')).toBe(0)
     expect(typeAwareCount('recommended')).toBeGreaterThan(20)
     expect(typeAwareCount('strict')).toBeGreaterThan(typeAwareCount('recommended'))
-    expect(typeAwareCount('paranoid')).toBeGreaterThan(typeAwareCount('strict'))
-  })
-
-  it('keeps the noisiest whole-codebase policies out until paranoid', () => {
-    expect(targetsAt({ level: 'strict' })).not.toContain('typescript/strict-boolean-expressions')
-    expect(targetsAt({ level: 'paranoid' })).toContain('typescript/strict-boolean-expressions')
+    expect(typeAwareCount('paranoid')).toBe(typeAwareCount('strict'))
   })
 })
 

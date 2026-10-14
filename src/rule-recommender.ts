@@ -165,8 +165,11 @@ function meetsLevel(level: AuditLevel, minimum: AuditLevel): boolean {
  * - `nursery` is explicitly unstable upstream, so a config carrying it would change meaning
  *   on an Oxlint patch and break determinism.
  *
- * `paranoid` therefore means depth of checking rather than breadth of opinion: it adds the
- * type-aware rules that reject a lot of working code, not a category of style preferences.
+ * A category enables every rule in it, type-aware ones included once `typeAware` is on, so
+ * a rule is listed at the level where its category starts it rather than where it would
+ * ideally sit; the conformance tests hold every row to that. With Oxlint's current
+ * categories that leaves `paranoid` adding nothing to `strict`: the policies it once held,
+ * like `strict-boolean-expressions`, arrive with `pedantic`.
  */
 const LEVEL_CATEGORIES: Array<{
   category: OxlintCategory
@@ -459,13 +462,13 @@ const TARGETED_RULES: Array<{
     requires: ['vue'],
     reason: 'A prop declared without a type gets no validation at all, in dev or production.',
   },
-  // Accessibility. These sit at `paranoid` on the ladder because a codebase that has never
-  // run them reports a great deal at once, but `--accessibility` reaches them at any level.
-  // Recommended at `error` rather than `warn`: a rule-level `warn` would override a higher
-  // severity inherited from an enabled category, quietly weakening what was already on.
+  // Accessibility. All of these are in Oxlint's `correctness` category, so they run at
+  // `error` from `basic` wherever JSX is detected and the `jsx-a11y` plugin is on; they are
+  // listed there, and naming them states what the category already does. Recommended at
+  // `error` rather than `warn`: a rule-level `warn` would override the category's severity.
   {
     rule: 'jsx-a11y/alt-text',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -473,7 +476,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/anchor-has-content',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -481,7 +484,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/anchor-is-valid',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -489,7 +492,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/aria-props',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -497,7 +500,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/aria-role',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -505,7 +508,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/click-events-have-key-events',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -513,7 +516,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/heading-has-content',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -521,7 +524,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/html-has-lang',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -529,7 +532,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/iframe-has-title',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -537,7 +540,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/img-redundant-alt',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -545,7 +548,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/interactive-supports-focus',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -553,7 +556,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/label-has-associated-control',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -561,7 +564,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/media-has-caption',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -569,7 +572,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/no-autofocus',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -577,7 +580,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/role-has-required-aria-props',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -585,7 +588,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/role-supports-aria-props',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -593,7 +596,7 @@ const TARGETED_RULES: Array<{
   },
   {
     rule: 'jsx-a11y/tabindex-no-positive',
-    level: 'paranoid',
+    level: 'basic',
     domains: ['accessibility'],
     severity: 'error',
     requires: ['jsx'],
@@ -675,11 +678,12 @@ const TARGETED_RULES: Array<{
  * run. When TypeScript is present but tsgolint is not, the capability is surfaced as a
  * prerequisite instead.
  *
- * These are the whole of what tsgolint implements, spread across the level ladder by how
- * much existing code they tend to reject. `recommended` holds the rules that find genuinely
- * unsound code; `strict` holds the ones that are right but reject a lot of working code;
- * `paranoid` holds the whole-codebase policies. `basic` deliberately carries none - it is
- * the level for a project that wants the config to run fast and say little.
+ * These are the whole of what tsgolint implements, spread across the level ladder.
+ * `recommended` holds the rules that find genuinely unsound code, plus what `correctness`
+ * and `suspicious` run once `typeAware` is on; `strict` holds what `pedantic` runs and the
+ * named style rules, which are right but reject a lot of working code. `basic` deliberately
+ * carries none - it is the level for a project that wants the config to run fast and say
+ * little.
  *
  * Every rule here is checked against docs/tsgolint-rules.tsv, including its `implemented`
  * status, by the inventory conformance test.
@@ -890,8 +894,8 @@ const TYPE_AWARE_RULES: Array<{
     level: 'recommended',
     reason: 'Interpolating an object into a template produces `[object Object]`.',
   },
-  // These six sit in `suspicious`, which `recommended` enables, so they run there whether or
-  // not they are named; they are listed at the level where they actually start.
+  // These eight sit in `suspicious`, which `recommended` enables, so they run there whether
+  // or not they are named; they are listed at the level where they actually start.
   {
     rule: 'typescript/no-unnecessary-boolean-literal-compare',
     severity: 'warn',
@@ -927,6 +931,18 @@ const TYPE_AWARE_RULES: Array<{
     severity: 'warn',
     level: 'recommended',
     reason: 'An assertion to a more specific type, with type information proving it unchecked.',
+  },
+  {
+    rule: 'typescript/no-unnecessary-type-parameters',
+    severity: 'warn',
+    level: 'recommended',
+    reason: 'A type parameter used once, which could be its constraint instead.',
+  },
+  {
+    rule: 'typescript/consistent-return',
+    severity: 'warn',
+    level: 'recommended',
+    reason: 'Mixing bare `return` with returned values in one function.',
   },
   {
     rule: 'typescript/no-confusing-void-expression',
@@ -1015,28 +1031,16 @@ const TYPE_AWARE_RULES: Array<{
     reason: 'A private field never reassigned after construction.',
   },
   {
-    rule: 'typescript/no-unnecessary-type-parameters',
-    severity: 'warn',
-    level: 'paranoid',
-    reason: 'A type parameter used once, which could be its constraint instead.',
-  },
-  {
     rule: 'typescript/strict-boolean-expressions',
     severity: 'warn',
-    level: 'paranoid',
+    level: 'strict',
     reason: 'Any non-boolean in a condition. A whole-codebase policy, not a defect.',
   },
   {
     rule: 'typescript/prefer-readonly-parameter-types',
     severity: 'warn',
-    level: 'paranoid',
+    level: 'strict',
     reason: 'Every object parameter declared readonly. Fires across an entire codebase at once.',
-  },
-  {
-    rule: 'typescript/consistent-return',
-    severity: 'warn',
-    level: 'paranoid',
-    reason: 'Mixing bare `return` with returned values in one function.',
   },
 ]
 

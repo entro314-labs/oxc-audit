@@ -90,13 +90,16 @@ Oxlint's own categories, so they mean here what they mean in a hand-written conf
 | Level                       | Categories             | Type-aware rules                          | Findings on a clean codebase |
 | --------------------------- | ---------------------- | ----------------------------------------- | ---------------------------- |
 | `--basic`                   | `correctness`          | none                                      | 0                            |
-| `--recommended` _(default)_ | `+ suspicious`         | the 32 that find unsound code             | ~38                          |
-| `--strict`                  | `+ pedantic`, `+ perf` | `+ 22` that reject a lot of working code  | ~341                         |
-| `--paranoid`                | same as strict         | `+ 5` whole-codebase policies             | ~350                         |
+| `--recommended` _(default)_ | `+ suspicious`         | the 39 that find unsound code             | ~36                          |
+| `--strict`                  | `+ pedantic`, `+ perf` | `+ 16` that reject a lot of working code  | ~499                         |
+| `--paranoid`                | same as strict         | same as strict                            | ~499                         |
 
-The last column was measured against this repository, which passes its own lint. `paranoid`
-means depth of checking rather than breadth of opinion, which is why it adds no categories
-over `strict`.
+The last column was measured against this repository's CLI sources, which pass their own
+lint. A category runs every rule in it - the type-aware ones too, once `typeAware` is on - so
+each rule is listed at the level where its category starts it, and a test holds every row to
+that. With Oxlint's current categories `--paranoid` therefore adds nothing over `--strict`:
+the whole-codebase policies it used to hold, `strict-boolean-expressions` and
+`prefer-readonly-parameter-types`, already arrive with `pedantic`.
 
 Three categories are never enabled, at any level:
 
@@ -119,7 +122,7 @@ whole security set, and nothing else moves.
 | ----------------- | ------------------------------------------------------------------------------------------------- |
 | `--security`      | The injection primitives, cookie and iframe rules, plus the `web-security` and `supabase` plugins |
 | `--performance`   | Oxlint's `perf` category, `react-perf`, and the quadratic-loop and context-value rules            |
-| `--accessibility` | 17 `jsx-a11y` rules that are off by default, at `error`                                           |
+| `--accessibility` | 17 `jsx-a11y` rules, at `error`; all in `correctness`, so they already run at every level        |
 
 ## Forcing a stack
 
@@ -321,14 +324,18 @@ Available with an extra install
       pnpm add -D oxlint-tsgolint
 ```
 
-All 59 rules tsgolint implements are placed on the level ladder, by how much working code
-each rejects rather than by how useful it is. `--recommended` carries the ones that find
-genuinely unsound code - the `no-unsafe-*` family, `no-floating-promises`, `only-throw-error`,
-`switch-exhaustiveness-check`. `--strict` adds the ones that are right but reject a great deal
-of working code. `--paranoid` adds the whole-codebase policies, `strict-boolean-expressions`
-and `prefer-readonly-parameter-types` among them. `--basic` carries none, and does not write
-`options.typeAware` at all, since the option exists only to load an engine that would have
-nothing to run.
+55 of the rules tsgolint implements are placed on the level ladder. `--recommended` carries
+the ones that find genuinely unsound code - the `no-unsafe-*` family, `no-floating-promises`,
+`only-throw-error`, `switch-exhaustiveness-check` - and whatever `correctness` and
+`suspicious` run once `typeAware` is on. `--strict` adds what `pedantic` runs and the named
+style rules, which are right but reject a great deal of working code. Two nursery rules,
+`prefer-optional-chain` and `no-unnecessary-condition`, are left out, as nursery always is.
+`--basic` carries none, and does not write `options.typeAware` at all, since the option exists
+only to load an engine that would have nothing to run.
+
+In a Vitest or Jest project the `no-unsafe-*` rules are turned off for test files through an
+override: mocks are `any` by construction, and on the projects measured test files produced
+over 90% of these rules' findings.
 
 Recommended type-aware rules are checked against `docs/tsgolint-rules.tsv` **including its
 `status` column**, so a rule tsgolint has not implemented yet can never be recommended -
