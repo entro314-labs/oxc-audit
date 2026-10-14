@@ -2,8 +2,14 @@ option	scope
 arrowParens	override.options
 arrowParens	top-level
 associations	top-level
+associations[].excludeFiles	associations
+associations[].files	associations
+associations[].language	associations
 astro	override.options
 astro	top-level
+astro.allowShorthand	astro
+astro.compressHTML	astro
+astro.skipFrontmatter	astro
 bracketSameLine	override.options
 bracketSameLine	top-level
 bracketSpacing	override.options

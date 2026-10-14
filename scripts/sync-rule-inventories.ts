@@ -143,9 +143,16 @@ async function buildOxfmtOptionsTsv(): Promise<string> {
   )) {
     rows.push([`overrides[].${option}`, 'overrides'])
   }
+  for (const option of propertyNames(
+    definitions.OxfmtAssociationConfig,
+    'oxfmt OxfmtAssociationConfig',
+  )) {
+    rows.push([`associations[].${option}`, 'associations'])
+  }
 
   // Nested option objects, keyed by the top-level option that carries them.
   const nestedConfigs = {
+    astro: 'AstroConfig',
     jsdoc: 'JsdocConfig',
     sortImports: 'SortImportsConfig',
     sortPackageJson: 'SortPackageJsonConfig',
