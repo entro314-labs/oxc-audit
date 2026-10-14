@@ -263,6 +263,14 @@ describe('audit', () => {
     expect(report.packageUpdate?.upgradeCommand).toBe('npm install -D oxlint@^1.88.0')
   })
 
+  it('warns a Biome project that oxfmt formats file types Biome left alone', async () => {
+    const dir = await setupProject({ ...REACT_PROJECT, 'biome.json': '{}' })
+
+    const report = await audit({ projectDir: dir })
+
+    expect(report.warnings.some((warning) => warning.includes('Biome left alone'))).toBe(true)
+  })
+
   it('reports a missing project directory as an error', async () => {
     const report = await audit({ projectDir: join(tmpdir(), 'oxc-audit-does-not-exist-xyz') })
 

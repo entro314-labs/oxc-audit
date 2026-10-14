@@ -309,6 +309,13 @@ async function planFormatterConfig(
     )
   }
 
+  // Prettier formats these file types too; Biome never did.
+  if (existingFormatter?.source === 'biome') {
+    reporter.warn(
+      'oxfmt also formats Markdown, YAML, TOML and HTML, which Biome left alone, so the first `oxfmt --write` reformats any such files. Add them to ignorePatterns in the oxfmt config if that is not wanted.',
+    )
+  }
+
   const { config, added } = mergeFormatterConfig(
     loaded.config,
     recommendFormatterConfig(stack, existingFormatter),

@@ -148,7 +148,7 @@ function fromPrettierReporting(
 
   if (leftovers.length > 0) {
     reporter.warn(
-      `${name} has settings with no oxfmt equivalent, which were not carried across: ${leftovers.join(', ')}.`,
+      `${name} has settings this tool does not carry into the oxfmt config: ${leftovers.join(', ')}. Copy any that oxfmt supports by hand.`,
     )
   }
 

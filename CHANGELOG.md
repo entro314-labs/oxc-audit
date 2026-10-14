@@ -20,17 +20,9 @@ All notable changes to this project will be documented in this file.
 - An `oxlint`, `oxfmt` or `oxlint-tsgolint` declared at a range below the release the rules were checked against (oxlint 1.88, oxfmt 0.73, tsgolint 7.0.2004) is reported with an upgrade command. Oxlint refuses to load a config that names a rule it does not have, so an older release could fail to lint at all. Ranges that are not plain semver (`catalog:`, `workspace:`, dist-tags) are not judged.
 - `--ts-config` creates `oxlint.config.ts` (`export default defineConfig({...})`) instead of `.oxlintrc.json` when the project has no Oxlint config. An existing `oxlint.config.ts` or `.mts` is now audited and updated in place, where previously any module config blocked the run. A module config that does more than export a plain object (other imports, `extends`, computed values) is reported but not rewritten.
 
-### Fixed
-
-- A React project declaring `react` as a dist-tag (`next`, `canary`) got no evidence of the automatic JSX runtime, so `react/react-in-jsx-scope` reported every component file (887 findings on one measured project). `compilerOptions.jsx` of `react-jsx` or `react-jsxdev` in `tsconfig.json` now establishes it.
-- A project with no `packageManager` field was always told to run `pnpm add -D`, even with a `package-lock.json`, `yarn.lock` or `bun.lock` beside its manifest. The lockfile now decides, and the pnpm default applies only when there is none.
-- A `pnpm-workspace.yaml` holding only settings (`minimumReleaseAge`, `allowBuilds`), which pnpm 10+ uses in single-package projects, made the project count as a workspace root and printed the "frameworks used in individual packages will be missed" warning. Only a file with a `packages` list counts now.
-- An existing root-anchored `ignorePatterns` entry such as `"/dist"` was reported as an absolute path and blocked `--write`. Oxlint reads it gitignore-style, anchored to the config directory, so it is now accepted; a leading `/` in `overrides` globs, where it matches nothing, is still reported.
-- A Prettier `endOfLine: "auto"` or Biome `lineEnding: "auto"` was copied into `.oxfmtrc.jsonc`, which oxfmt refuses to load, so every `format` and `format:check` run failed. It is left behind and reported.
-- A project formatted with Prettier's or Biome's defaults was reformatted wholesale on the first oxfmt run, because oxfmt wraps at 100 columns where both wrap at 80, and Biome indents with tabs. Those defaults are now pinned when the source config leaves them unset and `.editorconfig` sets no `max_line_length`.
-
 ### Changed
 
+- A project carrying its formatter settings over from Biome is warned that oxfmt also formats Markdown, YAML, TOML and HTML, which Biome left alone.
 - Prettier settings are also read from the `prettier` key of `package.json` and from a YAML `.prettierrc`, `.prettierrc.yaml` or `.prettierrc.yml`. `prettier-plugin-tailwindcss` and its `tailwind*` options become oxfmt's `sortTailwindcss`, and `experimentalOperatorPosition` is carried. Settings that cannot be carried, and a `.prettierrc.toml`, are reported instead of dropped silently.
 - The type-aware rules no longer name `typescript/prefer-optional-chain` or `typescript/no-unnecessary-condition`. Both are in Oxlint's unstable `nursery` category, which this tool otherwise never enables, and naming a rule runs it whatever its category. A test now checks that no recommended rule is in `nursery`.
 - `typescript/non-nullable-type-assertion-style` is no longer recommended at `--strict`. It rewrites `x as T` to `x!`, which `typescript/no-non-null-assertion` in the same config then reports.
@@ -39,6 +31,15 @@ All notable changes to this project will be documented in this file.
 - Every rule is now listed at the level where Oxlint's categories actually start running it, and a conformance test holds every row to that. Behaviour is unchanged; the labels were wrong. The 17 `jsx-a11y` rules are in `correctness` and always ran wherever JSX is detected, not only at `--paranoid` or with `--accessibility`. `strict-boolean-expressions` and `prefer-readonly-parameter-types` arrive with `pedantic` at `--strict`, and `consistent-return` and `no-unnecessary-type-parameters` with `suspicious` at `recommended`, once type-aware is on. With Oxlint's current categories `--paranoid` adds nothing over `--strict`, and `--help` and the README now say so.
 - Built and tested against oxlint 1.88, oxlint-tsgolint 7.0.2004 and oxfmt 0.73. The rule inventories under `docs/` now include `typescript/no-generated-empty-object-type` and oxfmt's `associations`, `astro` and `experimentalOperatorPosition` options.
 - `@entro314labs/oxlint-audit-plugins` depends on `@oxlint/plugins` 1.88 and requires Node.js 24.21 or later.
+
+### Fixed
+
+- A React project declaring `react` as a dist-tag (`next`, `canary`) got no evidence of the automatic JSX runtime, so `react/react-in-jsx-scope` reported every component file (887 findings on one measured project). `compilerOptions.jsx` of `react-jsx` or `react-jsxdev` in `tsconfig.json` now establishes it.
+- A project with no `packageManager` field was always told to run `pnpm add -D`, even with a `package-lock.json`, `yarn.lock` or `bun.lock` beside its manifest. The lockfile now decides, and the pnpm default applies only when there is none.
+- A `pnpm-workspace.yaml` holding only settings (`minimumReleaseAge`, `allowBuilds`), which pnpm 10+ uses in single-package projects, made the project count as a workspace root and printed the "frameworks used in individual packages will be missed" warning. Only a file with a `packages` list counts now.
+- An existing root-anchored `ignorePatterns` entry such as `"/dist"` was reported as an absolute path and blocked `--write`. Oxlint reads it gitignore-style, anchored to the config directory, so it is now accepted; a leading `/` in `overrides` globs, where it matches nothing, is still reported.
+- A Prettier `endOfLine: "auto"` or Biome `lineEnding: "auto"` was copied into `.oxfmtrc.jsonc`, which oxfmt refuses to load, so every `format` and `format:check` run failed. It is left behind and reported.
+- A project formatted with Prettier's or Biome's defaults was reformatted wholesale on the first oxfmt run, because oxfmt wraps at 100 columns where both wrap at 80, and Biome indents with tabs. Those defaults are now pinned when the source config leaves them unset and `.editorconfig` sets no `max_line_length`.
 
 ## [1.5.0] - 2026-09-08
 
