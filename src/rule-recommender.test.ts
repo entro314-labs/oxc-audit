@@ -449,3 +449,20 @@ describe('--dom', () => {
     expect(targets.filter((target) => target.startsWith('jsx-a11y/'))).toEqual([])
   })
 })
+
+describe('environments', () => {
+  const envs = (signals: StackSignalId[]): string[] =>
+    recommendForStack(stackOf(signals))
+      .filter(({ kind }) => kind === 'env')
+      .map(({ target }) => target)
+
+  it('declares browser for code that renders in one, and node for code that runs on it', () => {
+    expect(envs(['react', 'react-dom'])).toEqual(['browser'])
+    expect(envs(['node'])).toEqual(['node'])
+    expect(envs(['nextjs', 'node'])).toEqual(['browser', 'node'])
+  })
+
+  it('declares nothing without evidence', () => {
+    expect(envs(['typescript', 'esm'])).toEqual([])
+  })
+})

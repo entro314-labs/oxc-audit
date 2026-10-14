@@ -190,11 +190,21 @@ export interface ProjectStack {
 
 /** A single recommended change to the Oxlint config, with its justification. */
 export interface Recommendation {
-  kind: 'plugin' | 'js-plugin' | 'category' | 'rule' | 'option'
-  /** Plugin name, category name, rule name, or `options` key. */
+  kind: 'plugin' | 'js-plugin' | 'category' | 'rule' | 'option' | 'env'
+  /** Plugin name, category name, rule name, `options` key, or `env` name. */
   target: string
   /** Severity for category/rule recommendations. */
   severity?: OxlintSeverity
+  /**
+   * Rule options, written after the severity. Only ever written into a gap: a rule the
+   * config already names keeps the shape the project gave it.
+   */
+  options?: unknown[]
+  /**
+   * For a rule scoped to some files: the `overrides[].files` globs it is written under.
+   * Matched against an existing override with the same globs, in any order.
+   */
+  files?: string[]
   /**
    * Module path for `js-plugin` recommendations. Resolved from where the plugin package
    * was actually found, so the written config points at a file that exists.

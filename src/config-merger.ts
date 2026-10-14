@@ -43,9 +43,10 @@ export interface MergeResult {
  * 3. An explicit `off` is a decision, not a gap. It is reported but never overwritten.
  *
  * Together these mean a run can only ever add checks. That is what makes it safe to run
- * repeatedly against a config someone else maintains. The one recommendation that reads as
- * a removal - an `off` for a rule the evidence proves cannot apply - is written only into a
- * gap, so it removes nothing the project put there.
+ * repeatedly against a config someone else maintains. The recommendations that read as a
+ * removal - an `off` for a rule the evidence proves cannot apply, rule options that narrow
+ * what a rule reports, an override that relaxes a rule for some files - are written only
+ * into gaps, so they remove nothing the project put there.
  */
 export function mergeRecommendations(
   existingConfig: OxlintConfig,
@@ -59,7 +60,7 @@ export function mergeRecommendations(
   const explicitlyDisabled: Recommendation[] = []
 
   for (const recommendation of recommendations) {
-    const outcome = applyRecommendation(config, recommendation)
+    const outcome = applyRecommendation(config, recommendation, existingConfig)
 
     if (outcome === 'applied') {
       applied.push(recommendation)
@@ -75,7 +76,11 @@ export function mergeRecommendations(
 
 type ApplyOutcome = 'applied' | 'satisfied' | 'disabled'
 
-function applyRecommendation(config: OxlintConfig, recommendation: Recommendation): ApplyOutcome {
+function applyRecommendation(
+  config: OxlintConfig,
+  recommendation: Recommendation,
+  original: OxlintConfig,
+): ApplyOutcome {
   if (recommendation.kind === 'plugin') {
     return applyPlugin(config, recommendation.target as OxlintBuiltinPlugin)
   }
@@ -96,7 +101,84 @@ function applyRecommendation(config: OxlintConfig, recommendation: Recommendatio
     )
   }
 
-  return applyRule(config, recommendation.target, recommendation.severity ?? 'warn')
+  if (recommendation.kind === 'env') {
+    return applyEnv(config, recommendation.target)
+  }
+
+  const severity = recommendation.severity ?? 'warn'
+
+  if (recommendation.files !== undefined) {
+    return applyOverrideRule(
+      config,
+      original,
+      recommendation.files,
+      recommendation.target,
+      severity,
+    )
+  }
+
+  return applyRule(config, recommendation.target, severity, recommendation.options ?? [])
+}
+
+function applyEnv(config: OxlintConfig, env: string): ApplyOutcome {
+  const existing = config.env?.[env]
+
+  // An explicit `false` says the code does not run there.
+  if (existing === false) {
+    return 'disabled'
+  }
+
+  if (existing === true) {
+    return 'satisfied'
+  }
+
+  config.env = { ...config.env, [env]: true }
+
+  return 'applied'
+}
+
+/**
+ * Writes a rule into the override for `files`, creating that override when no existing one
+ * has the same globs.
+ *
+ * Scoped entries narrow a top-level rule for some files, so they are written only where the
+ * top level is this run's own doing: when the config the run started from already named
+ * the rule, the project has decided how it applies, and an override would quietly change
+ * that decision for part of the tree.
+ */
+function applyOverrideRule(
+  config: OxlintConfig,
+  original: OxlintConfig,
+  files: string[],
+  rule: string,
+  severity: OxlintSeverity,
+): ApplyOutcome {
+  const overrides = config.overrides ?? []
+  const index = overrides.findIndex((override) => sameGlobs(override.files, files))
+  const existing = index === -1 ? undefined : overrides[index]
+
+  if (existing?.rules?.[rule] !== undefined) {
+    return 'satisfied'
+  }
+
+  if (original.rules?.[rule] !== undefined) {
+    return 'satisfied'
+  }
+
+  const next = existing
+    ? { ...existing, rules: { ...existing.rules, [rule]: severity } }
+    : { files, rules: { [rule]: severity } }
+
+  config.overrides =
+    index === -1
+      ? [...overrides, next]
+      : overrides.map((entry, at) => (at === index ? next : entry))
+
+  return 'applied'
+}
+
+function sameGlobs(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((glob) => right.includes(glob))
 }
 
 function applyPlugin(config: OxlintConfig, plugin: OxlintBuiltinPlugin): ApplyOutcome {
@@ -187,7 +269,12 @@ function applyCategory(
   return 'applied'
 }
 
-function applyRule(config: OxlintConfig, rule: string, severity: OxlintSeverity): ApplyOutcome {
+function applyRule(
+  config: OxlintConfig,
+  rule: string,
+  severity: OxlintSeverity,
+  options: unknown[],
+): ApplyOutcome {
   const existing = config.rules?.[rule]
 
   // An `off` is recommended only on evidence that the rule cannot apply to the project.
@@ -222,7 +309,12 @@ function applyRule(config: OxlintConfig, rule: string, severity: OxlintSeverity)
     }
   }
 
-  config.rules = { ...config.rules, [rule]: severity }
+  config.rules = {
+    ...config.rules,
+    // Options go only into a gap. An entry the project wrote keeps its own shape, so a
+    // recommendation can never loosen a rule the project configured.
+    [rule]: existing === undefined && options.length > 0 ? [severity, ...options] : severity,
+  }
 
   return 'applied'
 }

@@ -95,6 +95,31 @@ const PLUGIN_RULES: Array<{
   },
 ]
 
+/**
+ * Runtime environments, declared from the evidence that code runs there.
+ *
+ * Oxlint knows only the ECMAScript globals unless `env` says otherwise, and several rules
+ * key off the globals an environment defines: without `browser` or `node`,
+ * `no-implied-eval` does not recognise a bare `setTimeout("...")` as a timer, and
+ * `no-global-assign` does not protect `window` or `process`. Declaring an environment
+ * adds no rule of its own, so it costs nothing where it is right. `no-undef`, the rule
+ * that would turn a wrong declaration into noise, is in `nursery` and never enabled.
+ */
+const ENV_RULES: Array<{ env: string; requires: StackSignalId[]; reason: string }> = [
+  {
+    env: 'browser',
+    requires: ['react-dom', 'nextjs', 'vue', 'svelte', 'astro', 'vite'],
+    reason:
+      'This code renders in a browser, so its globals are declared and the rules that key off them, like no-implied-eval on a bare setTimeout, can see them.',
+  },
+  {
+    env: 'node',
+    requires: ['node'],
+    reason:
+      'This code runs on Node, so its globals are declared and the rules that key off them, like no-global-assign on process, can see them.',
+  },
+]
+
 /** Where each level sits on the ladder, so `>=` comparisons read the way they mean. */
 const LEVEL_RANK: Record<AuditLevel, number> = {
   basic: 0,
@@ -1139,6 +1164,14 @@ export function recommendForStack(
 
     if (triggeredBy.length > 0) {
       recommendations.push({ kind: 'plugin', target: plugin, reason, triggeredBy })
+    }
+  }
+
+  for (const { env, requires, reason } of ENV_RULES) {
+    const triggeredBy = requires.filter((signal) => hasSignal(stack, signal))
+
+    if (triggeredBy.length > 0) {
+      recommendations.push({ kind: 'env', target: env, reason, triggeredBy })
     }
   }
 

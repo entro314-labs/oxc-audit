@@ -464,7 +464,9 @@ function formatTarget(recommendation: Recommendation): string {
   // rather than only in the written config.
   const specifier = recommendation.specifier ? pc.dim(` -> ${recommendation.specifier}`) : ''
 
-  return `${pc.cyan(recommendation.kind)} ${recommendation.target}${severity}${specifier}`
+  const scope = recommendation.files ? pc.dim(` in ${recommendation.files.join(', ')}`) : ''
+
+  return `${pc.cyan(recommendation.kind)} ${recommendation.target}${severity}${scope}${specifier}`
 }
 
 async function loadCliPackageMetadata(): Promise<z.infer<typeof CliPackageMetadataSchema>> {

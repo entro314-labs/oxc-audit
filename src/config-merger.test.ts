@@ -268,3 +268,124 @@ describe('mergeRecommendations - the additive invariant holds for any input', ()
     })
   }
 })
+
+describe('mergeRecommendations - rule options', () => {
+  const withOptions: Recommendation = {
+    ...rule('typescript/no-misused-promises', 'error'),
+    options: [{ checksVoidReturn: { attributes: false } }],
+  }
+
+  it('writes options with the severity when the rule is absent', () => {
+    const { config } = mergeRecommendations({}, [withOptions])
+
+    expect(config.rules?.['typescript/no-misused-promises']).toEqual([
+      'error',
+      { checksVoidReturn: { attributes: false } },
+    ])
+  })
+
+  it('never adds options to a rule the config already names', () => {
+    const { config, alreadySatisfied } = mergeRecommendations(
+      { rules: { 'typescript/no-misused-promises': 'error' } },
+      [withOptions],
+    )
+
+    expect(config.rules?.['typescript/no-misused-promises']).toBe('error')
+    expect(alreadySatisfied).toHaveLength(1)
+  })
+
+  it('raises a weaker entry without swapping its options for the recommended ones', () => {
+    const { config } = mergeRecommendations(
+      { rules: { 'typescript/no-misused-promises': ['warn', { checksConditionals: false }] } },
+      [withOptions],
+    )
+
+    expect(config.rules?.['typescript/no-misused-promises']).toEqual([
+      'error',
+      { checksConditionals: false },
+    ])
+  })
+})
+
+describe('mergeRecommendations - env', () => {
+  const env = (target: string): Recommendation => ({
+    kind: 'env',
+    target,
+    reason: 'test',
+    triggeredBy: [],
+  })
+
+  it('adds an environment beside the ones already declared', () => {
+    const { config } = mergeRecommendations({ env: { es2024: true } }, [env('node')])
+
+    expect(config.env).toEqual({ es2024: true, node: true })
+  })
+
+  it('treats an explicit false as a decision', () => {
+    const { config, explicitlyDisabled } = mergeRecommendations({ env: { browser: false } }, [
+      env('browser'),
+    ])
+
+    expect(config.env).toEqual({ browser: false })
+    expect(explicitlyDisabled).toHaveLength(1)
+  })
+})
+
+describe('mergeRecommendations - rules scoped to files', () => {
+  const testFiles = ['**/*.test.*', '**/*.spec.*']
+  const scoped = (target: string): Recommendation => ({
+    ...rule(target, 'off'),
+    files: testFiles,
+  })
+
+  it('creates the override alongside the top-level rule this run adds', () => {
+    const { config } = mergeRecommendations({}, [
+      rule('typescript/no-unsafe-call', 'error'),
+      scoped('typescript/no-unsafe-call'),
+    ])
+
+    expect(config.rules?.['typescript/no-unsafe-call']).toBe('error')
+    expect(config.overrides).toEqual([
+      { files: testFiles, rules: { 'typescript/no-unsafe-call': 'off' } },
+    ])
+  })
+
+  it('adds to an existing override with the same globs in any order', () => {
+    const { config } = mergeRecommendations(
+      {
+        overrides: [
+          { files: ['**/*.spec.*', '**/*.test.*'], rules: { 'no-console': 'off' } },
+          { files: ['scripts/**'], rules: {} },
+        ],
+      },
+      [scoped('typescript/no-unsafe-call')],
+    )
+
+    expect(config.overrides).toEqual([
+      {
+        files: ['**/*.spec.*', '**/*.test.*'],
+        rules: { 'no-console': 'off', 'typescript/no-unsafe-call': 'off' },
+      },
+      { files: ['scripts/**'], rules: {} },
+    ])
+  })
+
+  it('leaves the tree alone when the project already set the rule at the top level', () => {
+    const { config } = mergeRecommendations({ rules: { 'typescript/no-unsafe-call': 'error' } }, [
+      rule('typescript/no-unsafe-call', 'error'),
+      scoped('typescript/no-unsafe-call'),
+    ])
+
+    expect(config.overrides).toBeUndefined()
+  })
+
+  it('is satisfied on a second run', () => {
+    const recommendations = [
+      rule('typescript/no-unsafe-call', 'error'),
+      scoped('typescript/no-unsafe-call'),
+    ]
+    const first = mergeRecommendations({}, recommendations)
+
+    expect(mergeRecommendations(first.config, recommendations).changed).toBe(false)
+  })
+})

@@ -191,6 +191,20 @@ const FRAMEWORK_FIXTURES = [
   },
 ] as const
 
+describe('environments', () => {
+  it('lets no-implied-eval see a bare setTimeout once the environment is declared', async () => {
+    const dir = await setupProject({
+      ...REACT_PROJECT,
+      'src/timer.ts': 'setTimeout("alert(1)", 10)\n',
+    })
+
+    await audit({ projectDir: dir, write: true })
+    const { stdout } = await run(['--config', '.oxlintrc.json', 'src/timer.ts'], dir)
+
+    expect(stdout).toContain('no-implied-eval')
+  })
+})
+
 describe('framework file types are genuinely linted', () => {
   for (const fixture of FRAMEWORK_FIXTURES) {
     it(`detects ${fixture.name} and produces a config that lints its files`, async () => {
