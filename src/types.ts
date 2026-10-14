@@ -299,6 +299,14 @@ export interface PackageUpdate {
   missingDependencies: string[]
   /** The install command for the project's own package manager. */
   installCommand: string | undefined
+  /**
+   * Tools declared at a range whose lowest version is older than the release this tool's
+   * rules were checked against, as `name range`. Ranges that are not plain semver are not
+   * judged.
+   */
+  outdatedDependencies: string[]
+  /** The command that raises them, for the project's own package manager. */
+  upgradeCommand: string | undefined
 }
 
 /** What happened to the formatter config, when `--format` asked for one. */

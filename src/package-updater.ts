@@ -9,6 +9,7 @@ import {
 } from './fs-utils.js'
 import { AUDIT_PLUGINS_PACKAGE } from './stack-detector.js'
 import type { PackageUpdate, Reporter } from './types.js'
+import { compareVersions, minimumVersionOf, OXC_TOOL_VERSIONS } from './versions.js'
 
 const PackageJsonSchema = z
   .object({
@@ -150,9 +151,17 @@ export async function updatePackageJson(
     scriptsAdded.push(name)
   }
 
-  const missingDependencies = requiredTools(manifest, options).filter(
-    (tool) => !hasDependency(manifest, tool),
-  )
+  const required = requiredTools(manifest, options)
+  const missingDependencies = required.filter((tool) => !hasDependency(manifest, tool))
+  const outdated = required.flatMap((tool) => {
+    const range = manifest.devDependencies?.[tool] ?? manifest.dependencies?.[tool]
+    const needed = OXC_TOOL_VERSIONS[tool]
+    const minimum = range === undefined ? null : minimumVersionOf(range)
+
+    return needed !== undefined && minimum !== null && compareVersions(minimum, needed) < 0
+      ? [{ tool, range: range ?? '', needed }]
+      : []
+  })
   const packageManager =
     typeof manifest.packageManager === 'string' ? manifest.packageManager : undefined
 
@@ -185,6 +194,14 @@ export async function updatePackageJson(
     installCommand:
       missingDependencies.length > 0
         ? installCommand(packageManager, missingDependencies)
+        : undefined,
+    outdatedDependencies: outdated.map(({ tool, range }) => `${tool} ${range}`),
+    upgradeCommand:
+      outdated.length > 0
+        ? installCommand(
+            packageManager,
+            outdated.map(({ tool, needed }) => `${tool}@^${needed}`),
+          )
         : undefined,
   }
 }

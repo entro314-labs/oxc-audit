@@ -364,10 +364,17 @@ function formatReport(report: AuditReport, write: boolean): string {
   }
 
   if (report.packageUpdate) {
-    const { path, scriptsAdded, written, missingDependencies, installCommand } =
-      report.packageUpdate
+    const {
+      path,
+      scriptsAdded,
+      written,
+      missingDependencies,
+      installCommand,
+      outdatedDependencies,
+      upgradeCommand,
+    } = report.packageUpdate
 
-    if (scriptsAdded.length > 0 || missingDependencies.length > 0) {
+    if (scriptsAdded.length > 0 || missingDependencies.length > 0 || upgradeCommand) {
       lines.push(pc.bold(written ? 'Scripts added' : 'Scripts'))
 
       if (scriptsAdded.length > 0) {
@@ -378,6 +385,14 @@ function formatReport(report: AuditReport, write: boolean): string {
         lines.push(
           `  ${pc.dim(`Not installed yet: ${missingDependencies.join(', ')}`)}`,
           `      ${installCommand}`,
+        )
+      }
+
+      if (upgradeCommand) {
+        lines.push(
+          `  ${pc.yellow(`Older than the release these rules were checked against: ${outdatedDependencies.join(', ')}`)}`,
+          `      ${pc.dim('Oxlint refuses a config that names a rule it does not have yet.')}`,
+          `      ${upgradeCommand}`,
         )
       }
 

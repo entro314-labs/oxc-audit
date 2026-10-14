@@ -247,6 +247,22 @@ describe('audit', () => {
     expect(report.packageUpdate?.missingDependencies).toEqual(['@oxlint/plugins'])
   })
 
+  it('reports an Oxc tool declared below the release the rules were checked against', async () => {
+    const dir = await setupProject({
+      ...REACT_PROJECT,
+      'package.json': JSON.stringify({
+        name: 'app',
+        packageManager: 'npm@11.0.0',
+        devDependencies: { oxlint: '^1.40.0', oxfmt: 'catalog:', typescript: '^5.0.0' },
+      }),
+    })
+
+    const report = await audit({ projectDir: dir })
+
+    expect(report.packageUpdate?.outdatedDependencies).toEqual(['oxlint ^1.40.0'])
+    expect(report.packageUpdate?.upgradeCommand).toBe('npm install -D oxlint@^1.88.0')
+  })
+
   it('reports a missing project directory as an error', async () => {
     const report = await audit({ projectDir: join(tmpdir(), 'oxc-audit-does-not-exist-xyz') })
 

@@ -1,4 +1,17 @@
 /**
+ * The Oxc tool versions the rule inventories and every recommendation are built against.
+ *
+ * Oxlint refuses to load a config naming a rule it does not have ("Rule ... not found"), so
+ * a project on an older release can fail to lint at all with what this tool writes. Kept
+ * equal to this package's own devDependencies by `versions.test.ts`.
+ */
+export const OXC_TOOL_VERSIONS: Readonly<Record<string, string>> = {
+  oxlint: '1.88.0',
+  oxfmt: '0.73.0',
+  'oxlint-tsgolint': '7.0.2004',
+}
+
+/**
  * The lowest version a range can resolve to.
  *
  * Handles the forms a manifest actually contains (`^1.2.3`, `~1.2.3`, `>=1.2.3`, `1.2.3`,
