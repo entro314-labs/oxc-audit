@@ -227,11 +227,24 @@ is what makes it safe in CI.
 3. **An explicit `off` is a decision.** A rule you turned off stays off. It is reported so
    the opt-out stays visible, but never re-enabled.
 
-One recommendation reads as a removal and is not one. `suspicious` carries
-`react/react-in-jsx-scope`, which demands a `React` binding the automatic JSX runtime never
-uses, so on a React 17+ or Next.js project it would report every component file. On that
-evidence alone - a `react` range that cannot resolve below 17, or Next.js - the rule is
-written as `off`, and only into a gap: any value you set for it, a re-enable included, stands.
+A few recommendations read as removals and are not ones. Each is written only into a gap,
+so any value you set yourself, a re-enable included, stands:
+
+- **`off` on evidence a rule cannot apply.** `suspicious` carries `react/react-in-jsx-scope`,
+  which demands a `React` binding the automatic JSX runtime never uses. On a `react` range
+  that cannot resolve below 17, Next.js, or `compilerOptions.jsx: "react-jsx"`, it is `off`.
+- **`off` for a syntax-only rule whose type-aware twin is on**, such as `no-implied-eval`
+  beside `typescript/no-implied-eval`, which would otherwise report every finding twice.
+- **`off` for three rules measured as noise**: `unicorn/consistent-function-scoping`,
+  `no-underscore-dangle` and `vitest/require-mock-type-parameters` reported idioms, not
+  defects, on almost every finding across 23 real projects.
+- **Rule options that narrow a rule**, such as `no-misused-promises` exempting async JSX
+  handlers and `no-unused-vars` honouring the `_` prefix. A rule you already configured
+  keeps its own options.
+- **An override for test files** that turns the `no-unsafe-*` rules off, where mocks are
+  `any` by construction.
+- **`ignorePatterns` for generated files** found on disk: minified JavaScript, or files
+  carrying a webpack or Turbopack runtime.
 
 Those invariants are asserted directly, over a matrix of existing configs, in
 `src/config-merger.test.ts`.
@@ -354,7 +367,10 @@ it - oxlint, tsgolint and oxfmt
 Options:
   -V, --version        output the version number
   -d, --dir <path>     Project directory to audit (default: current directory)
-  -c, --config <path>  Path to the Oxlint config (default: .oxlintrc.json)
+  -c, --config <path>  Path to the Oxlint config (default: the one Oxlint finds,
+                       else .oxlintrc.json)
+  --ts-config          Create oxlint.config.ts instead of .oxlintrc.json when
+                       the project has no Oxlint config
   -w, --write          Apply the recommendations. Without this the audit only
                        reports.
   --no-backup          Skip writing a .backup copy before applying changes
@@ -372,14 +388,15 @@ Options:
                        (default)
   --strict             Also pedantic and perf, and the type-aware rules that
                        reject working code
-  --paranoid           Also the whole-codebase type-aware policies; no further
-                       categories
+  --paranoid           Same as --strict: Oxlint's categories already run what it
+                       used to add
   --security           Enable the security rule set regardless of the level
   --performance        Enable the performance rule set regardless of the level
   --accessibility      Enable the accessibility rule set regardless of the level
   --typescript         Audit as if typescript and tsconfig were present
   --react              Audit as if react, react-dom and jsx were present
-  --next               Audit as if nextjs, react, react-dom and jsx were present
+  --next               Audit as if nextjs, react, react-dom, jsx and
+                       react-jsx-runtime were present
   --vue                Audit as if vue were present
   --svelte             Audit as if svelte were present
   --astro              Audit as if astro were present
