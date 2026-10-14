@@ -18,7 +18,7 @@ function stackOf(signals: Array<StackSignalId | [StackSignalId, EvidenceKind]>):
     sourceExtensions: ['.ts'],
     filesScanned: 1,
     scanTruncated: false,
-    minifiedFiles: [],
+    generatedFiles: [],
   }
 }
 
@@ -501,20 +501,20 @@ describe('test files', () => {
   })
 })
 
-describe('minified files', () => {
-  const ignores = (minifiedFiles: string[]): string[] =>
-    recommendForStack({ ...stackOf(['esm']), minifiedFiles })
+describe('generated files', () => {
+  const ignores = (generatedFiles: string[]): string[] =>
+    recommendForStack({ ...stackOf(['esm']), generatedFiles })
       .filter(({ kind }) => kind === 'ignore')
       .map(({ target }) => target)
 
-  it('names each minified file and folds every .min.js into one glob', () => {
+  it('names each generated file and folds every .min.js into one glob', () => {
     expect(ignores(['public/worker.js', 'a.min.js', 'lib/b.min.js'])).toEqual([
       '**/*.min.js',
       'public/worker.js',
     ])
   })
 
-  it('ignores nothing when nothing minified was found', () => {
+  it('ignores nothing when nothing generated was found', () => {
     expect(ignores([])).toEqual([])
   })
 })

@@ -195,10 +195,11 @@ export interface ProjectStack {
   /** True when the scan stopped at the file budget rather than exhausting the tree. */
   scanTruncated: boolean
   /**
-   * Scanned JavaScript files that are minified - a line over 1,000 characters - relative to
-   * the project, with `/` separators. Generated or vendored code no rule was written for.
+   * Scanned JavaScript files that are generated rather than written - minified (a line over
+   * 1,000 characters) or carrying a bundler's runtime - relative to the project, with `/`
+   * separators. Code no rule was written for.
    */
-  minifiedFiles: string[]
+  generatedFiles: string[]
 }
 
 /** A single recommended change to the Oxlint config, with its justification. */

@@ -459,7 +459,7 @@ function buildErrorReport(
       sourceExtensions: [],
       filesScanned: 0,
       scanTruncated: false,
-      minifiedFiles: [],
+      generatedFiles: [],
     },
     recommendations: [],
     alreadySatisfied: [],

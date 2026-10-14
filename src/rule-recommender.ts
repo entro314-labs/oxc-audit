@@ -121,17 +121,18 @@ const ENV_RULES: Array<{ env: string; requires: StackSignalId[]; reason: string 
 ]
 
 /**
- * Ignore patterns for the minified files the scan found.
+ * Ignore patterns for the generated files the scan found.
  *
  * Linting generated or vendored code reports thousands of findings nobody will fix - one
- * minified worker in `public/` produced 45,000 of a project's 46,000. Every `.min.js`
- * collapses into one glob; any other minified file is named exactly, so nothing
- * hand-written is caught by a pattern broader than the evidence.
+ * minified worker in `public/` produced 45,000 of a project's 46,000, and a directory of
+ * committed webpack chunks 36,000 of another's 37,000. Every `.min.js` collapses into one
+ * glob; any other generated file is named exactly, so nothing hand-written is caught by a
+ * pattern broader than the evidence.
  */
-export function minifiedIgnorePatterns(stack: ProjectStack): string[] {
-  const named = stack.minifiedFiles.filter((path) => !path.endsWith('.min.js'))
+export function generatedIgnorePatterns(stack: ProjectStack): string[] {
+  const named = stack.generatedFiles.filter((path) => !path.endsWith('.min.js'))
 
-  return [...(stack.minifiedFiles.length > named.length ? ['**/*.min.js'] : []), ...named]
+  return [...(stack.generatedFiles.length > named.length ? ['**/*.min.js'] : []), ...named]
 }
 
 /** Where each level sits on the ladder, so `>=` comparisons read the way they mean. */
@@ -1300,12 +1301,12 @@ export function recommendForStack(
     }
   }
 
-  for (const pattern of minifiedIgnorePatterns(stack)) {
+  for (const pattern of generatedIgnorePatterns(stack)) {
     recommendations.push({
       kind: 'ignore',
       target: pattern,
       reason:
-        'Minified - a line over 1,000 characters - so generated or vendored code that no rule here was written for.',
+        'Generated - minified, or carrying a bundler runtime - so code that no rule here was written for.',
       triggeredBy: [],
     })
   }

@@ -230,7 +230,7 @@ describe('rule options', () => {
   })
 })
 
-describe('minified files', () => {
+describe('generated files', () => {
   it('keeps a vendored minified file out of both the linter and the formatter', async () => {
     const dir = await setupProject({
       ...REACT_PROJECT,
@@ -541,7 +541,7 @@ describe('recommendations never weaken a rule its category already enables', () 
     sourceExtensions: ['.ts', '.tsx', '.vue'],
     filesScanned: 3,
     scanTruncated: false,
-    minifiedFiles: [],
+    generatedFiles: [],
   }
 
   const requests: AuditRequest[] = [

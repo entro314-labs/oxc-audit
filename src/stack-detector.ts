@@ -217,7 +217,7 @@ export async function detectStack(
     sourceExtensions: [...scan.extensions].sort(),
     filesScanned: scan.filesScanned,
     scanTruncated: scan.truncated,
-    minifiedFiles: scan.minified,
+    generatedFiles: scan.generated,
   }
 }
 
@@ -449,7 +449,7 @@ interface SourceScan {
   extensions: Set<string>
   filesScanned: number
   truncated: boolean
-  minified: string[]
+  generated: string[]
 }
 
 const JAVASCRIPT_EXTENSIONS = new Set(['.js', '.mjs', '.cjs'])
@@ -458,21 +458,28 @@ const JAVASCRIPT_EXTENSIONS = new Set(['.js', '.mjs', '.cjs'])
 const MINIFIED_LINE_LENGTH = 1000
 
 /**
- * True when the file opens with a line longer than {@link MINIFIED_LINE_LENGTH}. Only the
- * first 64 KiB is read: a minified file is long-lined from its first statement.
+ * Identifiers only a bundler's emitted runtime contains: webpack's chunk-loading global
+ * and Turbopack's. Hand-written source configures a bundler, it does not define these.
  */
-async function isMinified(path: string): Promise<boolean> {
+const BUNDLER_RUNTIME = /\bwebpackChunk\w*|\bTURBOPACK\b|__turbopack_context__/u
+
+/**
+ * True when the file is generated rather than written: minified, with a line longer than
+ * {@link MINIFIED_LINE_LENGTH}, or bundler output that defines a bundler's runtime. Only the
+ * first 64 KiB is read; both show from the first statements.
+ */
+async function isGenerated(path: string): Promise<boolean> {
   const handle = await open(path, 'r')
 
   try {
     const buffer = Buffer.alloc(64 * 1024)
     const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
+    const text = buffer.subarray(0, bytesRead).toString('utf-8')
 
-    return buffer
-      .subarray(0, bytesRead)
-      .toString('utf-8')
-      .split('\n')
-      .some((line) => line.length > MINIFIED_LINE_LENGTH)
+    return (
+      BUNDLER_RUNTIME.test(text) ||
+      text.split('\n').some((line) => line.length > MINIFIED_LINE_LENGTH)
+    )
   } finally {
     await handle.close()
   }
@@ -481,7 +488,7 @@ async function isMinified(path: string): Promise<boolean> {
 /** Walks the source tree breadth-first, collecting which source extensions exist. */
 async function scanSourceTree(projectDir: string, maxFiles: number): Promise<SourceScan> {
   const extensions = new Set<string>()
-  const minified: string[] = []
+  const generated: string[] = []
   const queue: string[] = [projectDir]
   let filesScanned = 0
 
@@ -523,15 +530,15 @@ async function scanSourceTree(projectDir: string, maxFiles: number): Promise<Sou
       }
 
       const path = join(currentDir, entry.name)
-      if (JAVASCRIPT_EXTENSIONS.has(extension) && (await isMinified(path))) {
-        minified.push(relative(projectDir, path).split(sep).join('/'))
+      if (JAVASCRIPT_EXTENSIONS.has(extension) && (await isGenerated(path))) {
+        generated.push(relative(projectDir, path).split(sep).join('/'))
       }
 
       if (filesScanned >= maxFiles) {
-        return { extensions, filesScanned, truncated: true, minified: minified.sort() }
+        return { extensions, filesScanned, truncated: true, generated: generated.sort() }
       }
     }
   }
 
-  return { extensions, filesScanned, truncated: false, minified: minified.sort() }
+  return { extensions, filesScanned, truncated: false, generated: generated.sort() }
 }
