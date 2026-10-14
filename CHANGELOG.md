@@ -17,6 +17,10 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
+- The type-aware rules no longer name `typescript/prefer-optional-chain` or `typescript/no-unnecessary-condition`. Both are in Oxlint's unstable `nursery` category, which this tool otherwise never enables, and naming a rule runs it whatever its category. A test now checks that no recommended rule is in `nursery`.
+- `typescript/non-nullable-type-assertion-style` is no longer recommended at `--strict`. It rewrites `x as T` to `x!`, which `typescript/no-non-null-assertion` in the same config then reports.
+- `typescript/strict-void-return` is no longer named at `recommended`, where it reported `promisify(execFile)` and every `onClick` handler that returns a value. Oxlint's `pedantic` category still enables it from `--strict`.
+- Six type-aware rules in Oxlint's `suspicious` category (`no-unnecessary-boolean-literal-compare`, `no-unnecessary-type-arguments`, `no-unnecessary-type-assertion`, `no-unnecessary-type-conversion`, `no-unnecessary-template-expression`, `no-unsafe-type-assertion`) are listed at `recommended`, where the category already ran them, instead of `--strict`.
 - Built and tested against oxlint 1.88, oxlint-tsgolint 7.0.2004 and oxfmt 0.73. The rule inventories under `docs/` now include `typescript/no-generated-empty-object-type` and oxfmt's `associations`, `astro` and `experimentalOperatorPosition` options.
 - `@entro314labs/oxlint-audit-plugins` depends on `@oxlint/plugins` 1.88 and requires Node.js 24.21 or later.
 

@@ -8,7 +8,11 @@ import { describe, expect, it } from 'vitest'
 
 import { OXLINT_DEFAULT_PLUGINS } from './config-merger.js'
 import { audit } from './index.js'
-import { getRecommendablePlugins, recommendForStack } from './rule-recommender.js'
+import {
+  getRecommendablePlugins,
+  getRecommendableRuleNames,
+  recommendForStack,
+} from './rule-recommender.js'
 import type { AuditRequest, ProjectStack } from './types.js'
 
 const execFileAsync = promisify(execFile)
@@ -511,6 +515,13 @@ describe('recommendations never weaken a rule its category already enables', () 
     })),
     { level: 'paranoid', domains: [], maximal: true, forcedSignals: [] },
   ]
+
+  it('never names a rule from the nursery category, whose rules are unstable upstream', async () => {
+    const categories = await readRuleCategories()
+    const nursery = getRecommendableRuleNames().filter((rule) => categories.get(rule) === 'nursery')
+
+    expect(nursery).toEqual([])
+  })
 
   it.each(requests)('holds at %o', async (request) => {
     const categories = await readRuleCategories()

@@ -221,7 +221,7 @@ describe('audit plugin prerequisites', () => {
       )?.reason
 
     expect(reasonAt('recommended')).toMatch(/^\d+ type-aware rules at the recommended level/u)
-    expect(reasonAt('paranoid')).toMatch(/^59 type-aware rules at the paranoid level/u)
+    expect(reasonAt('paranoid')).toMatch(/^55 type-aware rules at the paranoid level/u)
   })
 
   it("names the project's own package manager in the install command", () => {

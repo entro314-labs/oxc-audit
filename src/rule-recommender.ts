@@ -816,12 +816,6 @@ const TYPE_AWARE_RULES: Array<{
     reason:
       'Calling an API its own author marked deprecated, which type information can see and syntax cannot.',
   },
-  {
-    rule: 'typescript/strict-void-return',
-    severity: 'error',
-    level: 'recommended',
-    reason: 'Returning a value where void is expected means the caller silently discards it.',
-  },
   // These five sit in Oxlint's `correctness` category, which every level enables at `error`,
   // so they run the moment `typeAware` is on. Naming them at anything below `error` would
   // override the category and quietly weaken a check that was already active.
@@ -855,6 +849,44 @@ const TYPE_AWARE_RULES: Array<{
     level: 'recommended',
     reason: 'Interpolating an object into a template produces `[object Object]`.',
   },
+  // These six sit in `suspicious`, which `recommended` enables, so they run there whether or
+  // not they are named; they are listed at the level where they actually start.
+  {
+    rule: 'typescript/no-unnecessary-boolean-literal-compare',
+    severity: 'warn',
+    level: 'recommended',
+    reason: 'Comparing a boolean against a literal adds a step that changes nothing.',
+  },
+  {
+    rule: 'typescript/no-unnecessary-type-arguments',
+    severity: 'warn',
+    level: 'recommended',
+    reason: 'A type argument identical to the default is noise.',
+  },
+  {
+    rule: 'typescript/no-unnecessary-type-assertion',
+    severity: 'warn',
+    level: 'recommended',
+    reason: 'An assertion that changes no type is either redundant or hiding a stale assumption.',
+  },
+  {
+    rule: 'typescript/no-unnecessary-type-conversion',
+    severity: 'warn',
+    level: 'recommended',
+    reason: 'Converting a value to the type it already has.',
+  },
+  {
+    rule: 'typescript/no-unnecessary-template-expression',
+    severity: 'warn',
+    level: 'recommended',
+    reason: 'A template literal wrapping a string that is already a string.',
+  },
+  {
+    rule: 'typescript/no-unsafe-type-assertion',
+    severity: 'warn',
+    level: 'recommended',
+    reason: 'An assertion to a more specific type, with type information proving it unchecked.',
+  },
   {
     rule: 'typescript/no-confusing-void-expression',
     severity: 'warn',
@@ -862,52 +894,10 @@ const TYPE_AWARE_RULES: Array<{
     reason: 'Using a void expression as a value reads as if it produced something.',
   },
   {
-    rule: 'typescript/no-unnecessary-boolean-literal-compare',
-    severity: 'warn',
-    level: 'strict',
-    reason: 'Comparing a boolean against a literal adds a step that changes nothing.',
-  },
-  {
-    rule: 'typescript/no-unnecessary-type-arguments',
-    severity: 'warn',
-    level: 'strict',
-    reason: 'A type argument identical to the default is noise.',
-  },
-  {
-    rule: 'typescript/no-unnecessary-type-assertion',
-    severity: 'warn',
-    level: 'strict',
-    reason: 'An assertion that changes no type is either redundant or hiding a stale assumption.',
-  },
-  {
-    rule: 'typescript/no-unnecessary-type-conversion',
-    severity: 'warn',
-    level: 'strict',
-    reason: 'Converting a value to the type it already has.',
-  },
-  {
-    rule: 'typescript/no-unnecessary-template-expression',
-    severity: 'warn',
-    level: 'strict',
-    reason: 'A template literal wrapping a string that is already a string.',
-  },
-  {
     rule: 'typescript/no-unnecessary-qualifier',
     severity: 'warn',
     level: 'strict',
     reason: 'A namespace qualifier that resolves to the enclosing scope.',
-  },
-  {
-    rule: 'typescript/non-nullable-type-assertion-style',
-    severity: 'warn',
-    level: 'strict',
-    reason: '`as T` where `!` says the same thing more clearly.',
-  },
-  {
-    rule: 'typescript/no-unsafe-type-assertion',
-    severity: 'warn',
-    level: 'strict',
-    reason: 'An assertion to a more specific type, with type information proving it unchecked.',
   },
   {
     rule: 'typescript/prefer-find',
@@ -920,12 +910,6 @@ const TYPE_AWARE_RULES: Array<{
     severity: 'warn',
     level: 'strict',
     reason: '`indexOf(x) !== -1` says `includes(x)` the long way.',
-  },
-  {
-    rule: 'typescript/prefer-optional-chain',
-    severity: 'warn',
-    level: 'strict',
-    reason: 'A chain of `&&` guards that `?.` expresses directly.',
   },
   {
     rule: 'typescript/prefer-nullish-coalescing',
@@ -988,13 +972,6 @@ const TYPE_AWARE_RULES: Array<{
     severity: 'warn',
     level: 'strict',
     reason: 'A private field never reassigned after construction.',
-  },
-  {
-    rule: 'typescript/no-unnecessary-condition',
-    severity: 'warn',
-    level: 'paranoid',
-    reason:
-      'A condition the types prove is always true or always false. Very noisy where types are approximate.',
   },
   {
     rule: 'typescript/no-unnecessary-type-parameters',
