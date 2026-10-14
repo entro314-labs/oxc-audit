@@ -392,6 +392,24 @@ describe('type-aware linting', () => {
     expect([...files]).toEqual(['src/a.ts'])
   })
 
+  it('reports a finding once, not again from the syntax-only twin', async () => {
+    const dir = await setupProject({
+      ...TYPE_AWARE_PROJECT,
+      'package.json': JSON.stringify({
+        name: 'app',
+        type: 'module',
+        dependencies: { 'react-dom': '^19.0.0' },
+        devDependencies: { typescript: '^5.0.0', 'oxlint-tsgolint': '^7.0.2001' },
+      }),
+      'src/a.ts': 'setTimeout("alert(1)", 10)\n',
+    })
+
+    await audit({ projectDir: dir, write: true })
+    const { stdout } = await run(['--config', '.oxlintrc.json', '--type-aware', 'src'], dir)
+
+    expect(stdout.split('\n').filter((line) => line.includes('implied-eval'))).toHaveLength(1)
+  })
+
   it('reports type-aware as a prerequisite instead of configuring it when the engine is absent', async () => {
     const dir = await setupProject({
       'package.json': JSON.stringify({ name: 'app', devDependencies: { typescript: '^5.0.0' } }),

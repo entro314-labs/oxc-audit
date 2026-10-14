@@ -1045,6 +1045,22 @@ const TYPE_AWARE_RULES: Array<{
 ]
 
 /**
+ * Syntax-only rules and the type-aware rule that checks the same thing with type
+ * information. With both on, one line is reported twice, and the type-aware twin is the more
+ * precise of the two, so when it is recommended the syntax-only one is written `off` into a
+ * gap. That `off` stays if `typeAware` is later turned off; delete it to get the syntax-only
+ * check back.
+ */
+const TYPE_AWARE_TWINS: Record<string, string> = {
+  'no-implied-eval': 'typescript/no-implied-eval',
+  'no-throw-literal': 'typescript/only-throw-error',
+  'prefer-promise-reject-errors': 'typescript/prefer-promise-reject-errors',
+  'require-await': 'typescript/require-await',
+  'unicorn/prefer-array-find': 'typescript/prefer-find',
+  'unicorn/prefer-string-starts-ends-with': 'typescript/prefer-string-starts-ends-with',
+}
+
+/**
  * Test files, as the two runners find them by default.
  */
 const TEST_FILES = ['**/*.test.*', '**/*.spec.*', '**/__tests__/**', '**/tests/**', '**/test/**']
@@ -1324,8 +1340,19 @@ export function recommendForStack(
     })
   }
 
+  const typeAwareRows =
+    hasSignal(stack, 'tsgolint') && hasSignal(stack, 'tsconfig')
+      ? TYPE_AWARE_RULES.filter(wanted)
+      : []
+  const typeAwareTwins = new Set(typeAwareRows.map(({ rule }) => rule))
+
   for (const entry of TARGETED_RULES) {
     const triggeredBy = entry.requires.filter((signal) => hasSignal(stack, signal))
+
+    // Its type-aware twin replaces it; see TYPE_AWARE_TWINS.
+    if (typeAwareTwins.has(TYPE_AWARE_TWINS[entry.rule] ?? '')) {
+      continue
+    }
 
     if (entry.requires.length > 0 && triggeredBy.length === 0) {
       continue
@@ -1349,8 +1376,22 @@ export function recommendForStack(
     })
   }
 
-  if (hasSignal(stack, 'tsgolint') && hasSignal(stack, 'tsconfig')) {
-    const typeAware = TYPE_AWARE_RULES.filter(wanted)
+  if (typeAwareTwins.size > 0) {
+    for (const [plain, twin] of Object.entries(TYPE_AWARE_TWINS)) {
+      if (typeAwareTwins.has(twin)) {
+        recommendations.push({
+          kind: 'rule',
+          target: plain,
+          severity: 'off',
+          reason: `${twin} checks the same thing with type information, so with both on each finding is reported twice.`,
+          triggeredBy: ['tsgolint'],
+        })
+      }
+    }
+  }
+
+  if (typeAwareRows.length > 0) {
+    const typeAware = typeAwareRows
 
     // The option is what makes Oxlint load the engine at all, so it is pointless without
     // at least one rule to run - `--basic` carries none.
@@ -1481,6 +1522,7 @@ export function getRecommendableRuleNames(): string[] {
     ...TARGETED_RULES.map(({ rule }) => rule),
     ...TYPE_AWARE_RULES.map(({ rule }) => rule),
     ...TEST_FILE_EXEMPTIONS,
+    ...Object.keys(TYPE_AWARE_TWINS),
   ]
 }
 

@@ -252,9 +252,15 @@ describe('the one recommended off', () => {
       .map(({ target }) => target)
 
     expect(offs.sort()).toEqual([
+      'no-implied-eval',
+      'no-throw-literal',
       'no-underscore-dangle',
+      'prefer-promise-reject-errors',
       'react/react-in-jsx-scope',
+      'require-await',
       'unicorn/consistent-function-scoping',
+      'unicorn/prefer-array-find',
+      'unicorn/prefer-string-starts-ends-with',
       'vitest/require-mock-type-parameters',
     ])
   })
@@ -510,5 +516,27 @@ describe('minified files', () => {
 
   it('ignores nothing when nothing minified was found', () => {
     expect(ignores([])).toEqual([])
+  })
+})
+
+describe('type-aware twins', () => {
+  const severityOf = (signals: StackSignalId[], level: AuditRequest['level'], rule: string) =>
+    recommendForStack(stackOf(signals), request({ level })).find(({ target }) => target === rule)
+      ?.severity
+
+  it('turns the syntax-only rule off once its type-aware twin is recommended', () => {
+    expect(
+      severityOf(['typescript', 'tsconfig', 'tsgolint'], 'recommended', 'no-implied-eval'),
+    ).toBe('off')
+    expect(severityOf(['typescript', 'tsconfig', 'tsgolint'], 'strict', 'require-await')).toBe(
+      'off',
+    )
+  })
+
+  it('keeps the syntax-only rule where type information is not available', () => {
+    expect(severityOf(['typescript', 'tsconfig'], 'recommended', 'no-implied-eval')).toBe('error')
+    expect(severityOf(['typescript', 'tsconfig', 'tsgolint'], 'basic', 'no-implied-eval')).toBe(
+      'error',
+    )
   })
 })
