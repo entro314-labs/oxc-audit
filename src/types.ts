@@ -314,8 +314,14 @@ export interface WorkspaceAuditReport {
 export interface AuditOptions {
   /** Directory to audit. Defaults to the current working directory. */
   projectDir?: string
-  /** Explicit path to the Oxlint config. Defaults to `.oxlintrc.json` in the project. */
+  /**
+   * Explicit path to the Oxlint config. Defaults to the config Oxlint would find in the
+   * project, or a new `.oxlintrc.json` when there is none. A `.ts`, `.mts`, `.js` or `.mjs`
+   * path is read and written as a module config.
+   */
   configPath?: string
+  /** Create `oxlint.config.ts` rather than `.oxlintrc.json` when the project has no config. */
+  tsConfig?: boolean
   /** Apply the recommendations. Without this the audit only reports. */
   write?: boolean
   /** Skip writing a `.backup` copy of an existing config. */

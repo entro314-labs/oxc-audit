@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- `--ts-config` creates `oxlint.config.ts` (`export default defineConfig({...})`) instead of `.oxlintrc.json` when the project has no Oxlint config. An existing `oxlint.config.ts` or `.mts` is now audited and updated in place, where previously any module config blocked the run. A module config that does more than export a plain object (other imports, `extends`, computed values) is reported but not rewritten.
+
 ### Changed
 
 - Built and tested against oxlint 1.88, oxlint-tsgolint 7.0.2004 and oxfmt 0.73. The rule inventories under `docs/` now include `typescript/no-generated-empty-object-type` and oxfmt's `associations`, `astro` and `experimentalOperatorPosition` options.

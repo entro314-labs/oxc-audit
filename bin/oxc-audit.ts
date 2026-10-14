@@ -35,6 +35,7 @@ interface ParsedCliOptions {
   /** Every level, domain and stack flag arrives here as an optional boolean. */
   [flag: string]: boolean | string | number | undefined
   config?: string
+  tsConfig?: boolean
   dir?: string
   write?: boolean
   backup?: boolean
@@ -101,6 +102,7 @@ export async function runCli(
   const auditOptions: AuditOptions = {
     projectDir: options.dir,
     configPath: options.config,
+    tsConfig: options.tsConfig ?? false,
     ...request,
     write: options.write ?? false,
     noBackup: options.backup === false,
@@ -170,7 +172,14 @@ function buildCommand(
       },
     })
     .option('-d, --dir <path>', 'Project directory to audit (default: current directory)')
-    .option('-c, --config <path>', 'Path to the Oxlint config (default: .oxlintrc.json)')
+    .option(
+      '-c, --config <path>',
+      'Path to the Oxlint config (default: the one Oxlint finds, else .oxlintrc.json)',
+    )
+    .option(
+      '--ts-config',
+      'Create oxlint.config.ts instead of .oxlintrc.json when the project has no Oxlint config',
+    )
     .option('-w, --write', 'Apply the recommendations. Without this the audit only reports.')
     .option('--no-backup', 'Skip writing a .backup copy before applying changes')
     .option(

@@ -137,6 +137,27 @@ Stack
 `--next` implies React, because a Next.js project is a React project and the rules gated on
 `react` would otherwise be skipped.
 
+## The config file
+
+The audit updates whichever config Oxlint would load: `.oxlintrc.json`, `.oxlintrc.jsonc`,
+or `oxlint.config.ts` / `.mts`. When there is none it creates `.oxlintrc.json`, or, with
+`--ts-config`, an `oxlint.config.ts`:
+
+```ts
+import { defineConfig } from 'oxlint'
+
+export default defineConfig({
+  plugins: ['react', 'typescript', 'unicorn'],
+  // ...
+})
+```
+
+A module config is read by importing it, the way Oxlint does. It is rewritten only while it
+is still a plain object - the file this tool wrote, reformatted or not. One that imports
+other configs, uses `extends`, or computes a value is left alone and the recommendations are
+reported for applying by hand, because writing back the evaluated object would replace that
+code with whatever it produced on this run.
+
 ## The formatter
 
 A formatter config is part of the toolchain, so `.oxfmtrc.jsonc` is written beside the linter

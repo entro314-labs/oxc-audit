@@ -17,8 +17,12 @@ import {
   containsComments,
   findOxlintConfig,
   findOxlintModuleConfig,
+  isModuleConfigPath,
+  isPlainModuleConfig,
   loadOxlintConfig,
   OXLINT_CONFIG_NAMES,
+  OXLINT_TS_CONFIG_NAME,
+  serializeOxlintConfig,
 } from './oxlint-config-loader.js'
 import { validateOxlintConfig } from './oxlint-config-validator.js'
 import { updatePackageJson } from './package-updater.js'
@@ -51,7 +55,11 @@ export async function audit(
 
   const configPath = options.configPath
     ? resolve(projectDir, options.configPath)
-    : ((await findOxlintConfig(projectDir)) ?? resolve(projectDir, OXLINT_CONFIG_NAMES[0] ?? ''))
+    : ((await findOxlintConfig(projectDir)) ??
+      resolve(
+        projectDir,
+        options.tsConfig ? OXLINT_TS_CONFIG_NAME : (OXLINT_CONFIG_NAMES[0] ?? ''),
+      ))
 
   // Only writes need serializing; a read-only audit cannot interfere with anything.
   let lock: Awaited<ReturnType<typeof acquireProjectLock>> | undefined
@@ -114,6 +122,12 @@ async function runAudit(
 
   if (loaded.existed) {
     reporter.info(`Found Oxlint config: ${configPath}`)
+
+    if (options.tsConfig && !isModuleConfigPath(configPath)) {
+      reporter.warn(
+        `--ts-config only chooses the format of a new config; the existing ${configPath} is kept and updated as JSON.`,
+      )
+    }
   } else {
     reporter.info(`No Oxlint config found; a new one would be created at ${configPath}`)
   }
@@ -130,7 +144,12 @@ async function runAudit(
   // `.oxlintrc.json`, so writing one beside `oxlint.config.ts` would break linting outright.
   const moduleConfigPath = await findOxlintModuleConfig(projectDir)
 
-  if (options.write && moduleConfigPath !== undefined && !loaded.existed) {
+  if (
+    options.write &&
+    moduleConfigPath !== undefined &&
+    !loaded.existed &&
+    !isModuleConfigPath(configPath)
+  ) {
     reporter.blocker(
       `${moduleConfigPath} already configures Oxlint, and Oxlint allows only one config per directory. Writing ${configPath} would stop it running entirely. Apply these recommendations to ${moduleConfigPath} by hand.`,
     )
@@ -140,6 +159,16 @@ async function runAudit(
   if (options.write && containsComments(loaded.originalText)) {
     reporter.blocker(
       `${configPath} contains comments, which would be lost when the file is rewritten. Apply the recommendations by hand, or strip the comments first.`,
+    )
+  } else if (
+    options.write &&
+    merge.changed &&
+    loaded.originalText !== undefined &&
+    isModuleConfigPath(configPath) &&
+    !isPlainModuleConfig(configPath, loaded.originalText, loaded.config)
+  ) {
+    reporter.blocker(
+      `${configPath} does more than export a plain config object - other imports, an extends, or computed values - and rewriting it would replace that code with the values it produced. Apply the recommendations by hand.`,
     )
   }
 
@@ -166,7 +195,7 @@ async function runAudit(
         }
       }
 
-      await writeTextFileAtomically(configPath, `${JSON.stringify(merge.config, null, 2)}\n`, {
+      await writeTextFileAtomically(configPath, serializeOxlintConfig(configPath, merge.config), {
         ensureDirectory: true,
         signal: options.signal,
       })

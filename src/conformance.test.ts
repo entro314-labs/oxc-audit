@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
@@ -31,14 +31,23 @@ async function run(args: string[], cwd: string): Promise<{ stdout: string; stder
   }
 }
 
+interface ResolvedConfig {
+  plugins?: string[]
+  categories?: Record<string, string>
+  rules?: Record<string, unknown>
+}
+
 /** Oxlint's own view of a config after defaults are resolved. */
-async function printResolvedConfig(
-  cwd: string,
-  configPath: string,
-): Promise<{ plugins?: string[]; categories?: Record<string, string> }> {
+async function printResolvedConfig(cwd: string, configPath: string): Promise<ResolvedConfig> {
   const { stdout } = await run(['--print-config', '--config', configPath], cwd)
 
-  return JSON.parse(stdout) as { plugins?: string[]; categories?: Record<string, string> }
+  return JSON.parse(stdout) as ResolvedConfig
+}
+
+/** `oxlint.config.ts` imports `defineConfig` from `oxlint`, so the project needs it. */
+async function linkOxlintPackage(dir: string): Promise<void> {
+  await mkdir(join(dir, 'node_modules'), { recursive: true })
+  await symlink(join(process.cwd(), 'node_modules', 'oxlint'), join(dir, 'node_modules', 'oxlint'))
 }
 
 async function setupProject(files: Record<string, string>): Promise<string> {
@@ -582,29 +591,66 @@ describe('the formatter config', () => {
 /**
  * Oxlint allows one config per directory and refuses to start when it finds two:
  * "Only one of `.oxlintrc.json` and `oxlint.config.ts` is allowed per directory."
- * Writing the JSON file beside a module config would take a project from linting to not
- * running at all, so it is blocked rather than written.
+ * A module config is therefore the config to update, never one to write a JSON file beside.
+ * It is rewritten only while it is a plain object; code in it is the user's to keep.
  */
 describe('projects configured with a module config', () => {
-  it('refuses to write a competing .oxlintrc.json', async () => {
+  it('updates the oxlint.config.ts it finds rather than writing a competing .oxlintrc.json', async () => {
     const dir = await setupProject({
       ...REACT_PROJECT,
-      'oxlint.config.ts': 'export default { rules: { "no-console": "error" } }\n',
+      'oxlint.config.ts': "export default { rules: { 'no-console': 'error' } }\n",
     })
+    await linkOxlintPackage(dir)
+
+    const report = await audit({ projectDir: dir, write: true })
+    const resolved = await printResolvedConfig(dir, 'oxlint.config.ts')
+
+    expect(report.blockers).toEqual([])
+    expect(report.config.written).toBe(true)
+    await expect(readFile(join(dir, '.oxlintrc.json'), 'utf-8')).rejects.toThrow(/ENOENT/u)
+    expect(resolved.plugins).toContain('react')
+    expect(resolved.rules?.['no-console']).toBe('deny')
+  })
+
+  it('leaves a module config with code in it alone, and still reports', async () => {
+    const original =
+      "export default { rules: { 'no-console': process.env.CI ? 'error' : 'warn' } }\n"
+    const dir = await setupProject({ ...REACT_PROJECT, 'oxlint.config.ts': original })
+
     const report = await audit({ projectDir: dir, write: true })
 
     expect(report.blockers.join('\n')).toMatch(/oxlint\.config\.ts/u)
+    expect(report.recommendations.length).toBeGreaterThan(0)
     expect(report.config.written).toBe(false)
+    expect(await readFile(join(dir, 'oxlint.config.ts'), 'utf-8')).toBe(original)
     await expect(readFile(join(dir, '.oxlintrc.json'), 'utf-8')).rejects.toThrow(/ENOENT/u)
   })
 
-  it('still reports what it would recommend', async () => {
-    const dir = await setupProject({
-      ...REACT_PROJECT,
-      'oxlint.config.ts': 'export default {}\n',
-    })
-    const report = await audit({ projectDir: dir, write: true })
+  it('refuses to write a .oxlintrc.json named explicitly beside a module config', async () => {
+    const dir = await setupProject({ ...REACT_PROJECT, 'oxlint.config.ts': 'export default {}\n' })
 
-    expect(report.recommendations.length).toBeGreaterThan(0)
+    const report = await audit({ projectDir: dir, configPath: '.oxlintrc.json', write: true })
+
+    expect(report.blockers.join('\n')).toMatch(/oxlint\.config\.ts/u)
+    await expect(readFile(join(dir, '.oxlintrc.json'), 'utf-8')).rejects.toThrow(/ENOENT/u)
+  })
+
+  it('creates an oxlint.config.ts on request that Oxlint loads and a second run finds complete', async () => {
+    const dir = await setupProject(REACT_PROJECT)
+    await linkOxlintPackage(dir)
+
+    const report = await audit({ projectDir: dir, tsConfig: true, write: true })
+    const resolved = await printResolvedConfig(dir, 'oxlint.config.ts')
+    const second = await audit({ projectDir: dir, tsConfig: true, write: true })
+
+    expect(report.config.path).toBe(join(dir, 'oxlint.config.ts'))
+    expect(report.config.written).toBe(true)
+    for (const plugin of report.recommendations
+      .filter((entry) => entry.kind === 'plugin')
+      .map((entry) => entry.target)) {
+      expect(resolved.plugins).toContain(plugin)
+    }
+    expect(second.blockers).toEqual([])
+    expect(second.config.changed).toBe(false)
   })
 })
