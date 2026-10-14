@@ -14,6 +14,7 @@ import type { LoadedOxfmtConfig } from './format-config-loader.js'
 import { recommendFormatterConfig } from './format-recommender.js'
 import { copyFileIfExists, pathExists, writeTextFileAtomically } from './fs-utils.js'
 import {
+  canResolveOxlint,
   containsComments,
   findOxlintConfig,
   findOxlintModuleConfig,
@@ -152,6 +153,17 @@ async function runAudit(
   ) {
     reporter.blocker(
       `${moduleConfigPath} already configures Oxlint, and Oxlint allows only one config per directory. Writing ${configPath} would stop it running entirely. Apply these recommendations to ${moduleConfigPath} by hand.`,
+    )
+  }
+
+  if (
+    options.write &&
+    !loaded.existed &&
+    isModuleConfigPath(configPath) &&
+    !canResolveOxlint(projectDir)
+  ) {
+    reporter.blocker(
+      `${configPath} would import defineConfig from oxlint, which is not installed in this project, so Oxlint could not load it. Install oxlint first.`,
     )
   }
 

@@ -120,6 +120,13 @@ describe('loadOxlintConfig', () => {
     await expect(loadOxlintConfig(configPath)).rejects.toThrow(/default export/u)
   })
 
+  it('ignores an oxlint.config.mjs, which Oxlint only loads through --config', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'oxc-audit-loader-'))
+    await writeFile(join(dir, 'oxlint.config.mjs'), 'export default {}\n', 'utf-8')
+
+    expect(await findOxlintConfig(dir)).toBeUndefined()
+  })
+
   it('finds a module config when the project has no JSON config', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'oxc-audit-loader-'))
     await writeFile(join(dir, 'oxlint.config.ts'), 'export default {}\n', 'utf-8')

@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { extname, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
@@ -12,19 +13,15 @@ import type { OxlintConfig } from './types.js'
 export const OXLINT_CONFIG_NAMES = ['.oxlintrc.json', '.oxlintrc.jsonc', 'oxlintrc.json']
 
 /**
- * Module config file names Oxlint also discovers.
+ * Module config file names Oxlint also discovers. A `.js` or `.mjs` config is loaded only
+ * when passed with `--config`, so neither is looked for here.
  *
  * Oxlint refuses to start when a directory holds both a module config and an
  * `.oxlintrc.json` — "Only one of `.oxlintrc.json` and `oxlint.config.ts` is allowed per
  * directory" — so creating the JSON file beside one would take the project's linting from
  * working to not running at all.
  */
-export const OXLINT_MODULE_CONFIG_NAMES = [
-  'oxlint.config.ts',
-  'oxlint.config.mts',
-  'oxlint.config.js',
-  'oxlint.config.mjs',
-]
+export const OXLINT_MODULE_CONFIG_NAMES = ['oxlint.config.ts', 'oxlint.config.mts']
 
 /** The module config in this directory, if one exists. */
 export async function findOxlintModuleConfig(projectDir: string): Promise<string | undefined> {
@@ -49,6 +46,19 @@ export interface LoadedOxlintConfig {
 
 /** The module config this tool creates when asked for a TypeScript config. */
 export const OXLINT_TS_CONFIG_NAME = 'oxlint.config.ts'
+
+/**
+ * True when `oxlint` resolves from the project, which a new module config needs: it imports
+ * `defineConfig` from there, so without it every later load of the file fails.
+ */
+export function canResolveOxlint(projectDir: string): boolean {
+  try {
+    createRequire(resolve(projectDir, 'package.json')).resolve('oxlint/package.json')
+    return true
+  } catch {
+    return false
+  }
+}
 
 /** True for a config Oxlint loads by importing it rather than parsing it as JSON. */
 export function isModuleConfigPath(configPath: string): boolean {

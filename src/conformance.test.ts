@@ -635,6 +635,15 @@ describe('projects configured with a module config', () => {
     await expect(readFile(join(dir, '.oxlintrc.json'), 'utf-8')).rejects.toThrow(/ENOENT/u)
   })
 
+  it('will not create an oxlint.config.ts whose defineConfig import cannot resolve', async () => {
+    const dir = await setupProject(REACT_PROJECT)
+
+    const report = await audit({ projectDir: dir, tsConfig: true, write: true })
+
+    expect(report.blockers.join('\n')).toMatch(/oxlint, which is not installed/u)
+    await expect(readFile(join(dir, 'oxlint.config.ts'), 'utf-8')).rejects.toThrow(/ENOENT/u)
+  })
+
   it('creates an oxlint.config.ts on request that Oxlint loads and a second run finds complete', async () => {
     const dir = await setupProject(REACT_PROJECT)
     await linkOxlintPackage(dir)
