@@ -173,6 +173,11 @@ export type StackSignalId =
   | 'react-jsx-runtime'
   /** The audit plugin package, as a dependency. It carries the runtime the plugins import. */
   | 'audit-plugins'
+  /**
+   * `@astrojs/compiler-rs`, which oxfmt loads to format `.astro` files and does not bundle.
+   * Astro's own copy is not enough: pnpm's strict layout keeps it out of reach.
+   */
+  | 'astro-compiler'
 
 export interface ProjectStack {
   projectDir: string

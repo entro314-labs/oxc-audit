@@ -1,5 +1,5 @@
 import { installCommand } from './package-updater.js'
-import { AUDIT_PLUGINS_PACKAGE, hasSignal } from './stack-detector.js'
+import { AUDIT_PLUGINS_PACKAGE, hasFrameworkFormatter, hasSignal } from './stack-detector.js'
 import { AUDIT_DOMAINS } from './types.js'
 import type {
   AuditDomain,
@@ -1466,6 +1466,7 @@ export function recommendForStack(
 export function findPrerequisites(
   stack: ProjectStack,
   request: AuditRequest = DEFAULT_REQUEST,
+  { format = true }: { format?: boolean } = {},
 ): Prerequisite[] {
   const prerequisites: Prerequisite[] = []
   const resolved = resolveRequest(request)
@@ -1493,6 +1494,24 @@ export function findPrerequisites(
         reason: `This project's dependencies match ${applicable.length} of the audit plugins, which catch deprecated APIs and migration residue that still type-checks and still runs.`,
         install: installCommand(stack.packageManager, [AUDIT_PLUGINS_PACKAGE]),
       })
+    }
+  }
+
+  if (format) {
+    for (const [framework, runtime] of [
+      ['svelte', 'svelte'],
+      ['astro', '@astrojs/compiler-rs'],
+    ] as const) {
+      if (
+        stack.sourceExtensions.includes(`.${framework}`) &&
+        !hasFrameworkFormatter(stack, framework)
+      ) {
+        prerequisites.push({
+          capability: `Formatting .${framework} files`,
+          reason: `oxfmt formats .${framework} files only with ${runtime} installed, which it loads at run time and does not bundle. Until then they are left unformatted.`,
+          install: installCommand(stack.packageManager, [runtime]),
+        })
+      }
     }
   }
 

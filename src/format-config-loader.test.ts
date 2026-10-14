@@ -78,15 +78,14 @@ describe('findExistingFormatterConfig', () => {
 
   it('reports what it could not carry rather than dropping it silently', async () => {
     const dir = await setupProject({
-      '.prettierrc.json': '{ "endOfLine": "auto", "plugins": ["prettier-plugin-svelte"] }',
+      '.prettierrc.json':
+        '{ "endOfLine": "auto", "plugins": ["prettier-plugin-organize-imports"] }',
     })
     const reporter = new CollectingReporter()
 
     await findExistingFormatterConfig(dir, reporter)
 
-    expect(reporter.getWarnings().join('\n')).toMatch(
-      /endOfLine: auto.*prettier-plugin-svelte|prettier-plugin-svelte.*endOfLine: auto/su,
-    )
+    expect(reporter.getWarnings().join('\n')).toMatch(/endOfLine: "auto"/su)
   })
 
   it('reports a TOML config it cannot parse', async () => {

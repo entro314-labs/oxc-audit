@@ -249,7 +249,7 @@ async function runAudit(
     recommendations: merge.applied,
     alreadySatisfied: merge.alreadySatisfied,
     configFindings,
-    prerequisites: findPrerequisites(stack, request),
+    prerequisites: findPrerequisites(stack, request, { format: options.format !== false }),
     explicitlyDisabled: merge.explicitlyDisabled,
     config: {
       path: configPath,

@@ -28,10 +28,17 @@ describe('carrying settings across from Prettier', () => {
   })
 
   it('drops keys oxfmt has no equivalent for rather than guessing one', () => {
-    const config = { semi: true, plugins: ['prettier-plugin-svelte'], requirePragma: true }
+    const config = {
+      semi: true,
+      plugins: ['prettier-plugin-organize-imports'],
+      requirePragma: true,
+    }
 
     expect(fromPrettier(config)).toEqual({ semi: true })
-    expect(prettierLeftovers(config)).toEqual(['requirePragma', 'plugin prettier-plugin-svelte'])
+    expect(prettierLeftovers(config)).toEqual([
+      'requirePragma',
+      'plugin prettier-plugin-organize-imports',
+    ])
   })
 
   it('turns the Tailwind plugin into the sorting oxfmt implements, options included', () => {
@@ -51,7 +58,7 @@ describe('carrying settings across from Prettier', () => {
     const config = { endOfLine: 'auto', semi: false }
 
     expect(fromPrettier(config)).toEqual({ semi: false })
-    expect(prettierLeftovers(config)).toEqual(['endOfLine: auto'])
+    expect(prettierLeftovers(config)).toEqual(['endOfLine: "auto"'])
     expect(fromBiome({ formatter: { lineEnding: 'auto' } })).toEqual({})
   })
 
@@ -190,5 +197,41 @@ describe('signals asserted on the command line', () => {
     withForcedSignals(detected, ['react', 'vue'])
 
     expect(detected).toEqual(snapshot)
+  })
+})
+
+describe('framework files', () => {
+  const svelteStack = (evidenceKind: 'dependency' | 'source-extension'): ProjectStack => ({
+    ...STACK,
+    sourceExtensions: ['.svelte', '.ts'],
+    signals: [{ id: 'svelte', evidence: [{ kind: evidenceKind, value: 'svelte' }] }],
+  })
+
+  it('turns .svelte formatting on when the svelte compiler oxfmt loads is installed', () => {
+    expect(recommendFormatterConfig(svelteStack('dependency'), undefined).svelte).toBe(true)
+  })
+
+  it('leaves it off without the compiler, where every format run would fail', () => {
+    expect(
+      recommendFormatterConfig(svelteStack('source-extension'), undefined).svelte,
+    ).toBeUndefined()
+    expect(
+      recommendFormatterConfig(svelteStack('source-extension'), {
+        source: 'prettier',
+        settings: fromPrettier({ plugins: ['prettier-plugin-svelte'] }),
+      }).svelte,
+    ).toBeUndefined()
+  })
+
+  it('keeps it off for a project whose formatter never formatted those files', () => {
+    expect(
+      recommendFormatterConfig(svelteStack('dependency'), { source: 'biome', settings: {} }).svelte,
+    ).toBeUndefined()
+    expect(
+      recommendFormatterConfig(svelteStack('dependency'), {
+        source: 'prettier',
+        settings: fromPrettier({ plugins: ['prettier-plugin-svelte'] }),
+      }).svelte,
+    ).toBe(true)
   })
 })

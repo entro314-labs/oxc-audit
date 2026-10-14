@@ -540,3 +540,22 @@ describe('type-aware twins', () => {
     )
   })
 })
+
+describe('formatter prerequisites', () => {
+  it('asks for the compiler oxfmt needs to format .astro files', () => {
+    const stack = { ...stackOf(['astro']), sourceExtensions: ['.astro'] }
+
+    expect(findPrerequisites(stack).map(({ install }) => install)).toContain(
+      'pnpm add -D @astrojs/compiler-rs',
+    )
+    expect(
+      findPrerequisites({
+        ...stackOf(['astro', 'astro-compiler']),
+        sourceExtensions: ['.astro'],
+      }).map(({ capability }) => capability),
+    ).not.toContain('Formatting .astro files')
+    expect(
+      findPrerequisites(stack, request({}), { format: false }).map(({ capability }) => capability),
+    ).not.toContain('Formatting .astro files')
+  })
+})

@@ -108,6 +108,7 @@ const DEPENDENCY_SIGNALS: Array<{ id: StackSignalId; packages: string[] }> = [
   { id: 'jsdoc', packages: ['jsdoc', 'typedoc'] },
   { id: 'svelte', packages: ['svelte'] },
   { id: 'astro', packages: ['astro'] },
+  { id: 'astro-compiler', packages: ['@astrojs/compiler-rs'] },
   // The engine behind Oxlint's type-aware rules. Without it `oxlint --type-aware` fails
   // with "Failed to find tsgolint executable", so its presence gates those rules.
   { id: 'tsgolint', packages: ['oxlint-tsgolint'] },
@@ -214,6 +215,25 @@ export async function detectStack(
     scanTruncated: scan.truncated,
     minifiedFiles: scan.minified,
   }
+}
+
+/**
+ * True when the package oxfmt loads to format a framework's files is a dependency of the
+ * project: `svelte` for `.svelte`, `@astrojs/compiler-rs` for `.astro`.
+ */
+export function hasFrameworkFormatter(stack: ProjectStack, framework: 'svelte' | 'astro'): boolean {
+  if (framework === 'astro') {
+    return hasSignal(stack, 'astro-compiler')
+  }
+
+  return stack.signals.some(
+    ({ id, evidence }) =>
+      id === 'svelte' &&
+      evidence.some(
+        ({ kind, value }) =>
+          (kind === 'dependency' || kind === 'dev-dependency') && value === 'svelte',
+      ),
+  )
 }
 
 /** True when the stack carries the given signal. */

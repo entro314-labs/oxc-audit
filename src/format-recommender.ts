@@ -1,5 +1,5 @@
 import { minifiedIgnorePatterns } from './rule-recommender.js'
-import { hasSignal } from './stack-detector.js'
+import { hasFrameworkFormatter, hasSignal } from './stack-detector.js'
 import type { OxfmtConfig, ProjectStack } from './types.js'
 
 /**
@@ -83,6 +83,10 @@ const BIOME_QUOTE_PROPERTIES: Record<string, string> = {
  */
 const OXFMT_LINE_ENDINGS = new Set(['lf', 'crlf', 'cr'])
 
+function isOxfmtLineEnding(value: unknown): boolean {
+  return typeof value === 'string' && OXFMT_LINE_ENDINGS.has(value)
+}
+
 /**
  * `prettier-plugin-tailwindcss` options, and the oxfmt `sortTailwindcss` key each becomes.
  * oxfmt implements the plugin's sorting itself and drops the `tailwind` prefix.
@@ -98,6 +102,12 @@ const TAILWIND_PLUGIN_KEYS: Record<string, string> = {
 
 const TAILWIND_PLUGIN = 'prettier-plugin-tailwindcss'
 
+/** Prettier plugins oxfmt implements, and the oxfmt option that enables each. */
+const FRAMEWORK_PLUGINS: Record<string, 'svelte' | 'astro'> = {
+  'prettier-plugin-svelte': 'svelte',
+  'prettier-plugin-astro': 'astro',
+}
+
 /** Translate a Prettier config into the oxfmt keys that mean the same thing. */
 export function fromPrettier(config: Record<string, unknown>): OxfmtConfig {
   const settings: Record<string, unknown> = {}
@@ -109,11 +119,18 @@ export function fromPrettier(config: Record<string, unknown>): OxfmtConfig {
       continue
     }
 
-    if (key === 'endOfLine' && !OXFMT_LINE_ENDINGS.has(String(value))) {
+    if (key === 'endOfLine' && !isOxfmtLineEnding(value)) {
       continue
     }
 
     settings[key] = value
+  }
+
+  // oxfmt runs these two plugins itself, behind an option that turns their file type on.
+  for (const [plugin, option] of Object.entries(FRAMEWORK_PLUGINS)) {
+    if (prettierPlugins(config).includes(plugin)) {
+      settings[option] = true
+    }
   }
 
   if (prettierPlugins(config).includes(TAILWIND_PLUGIN)) {
@@ -152,10 +169,10 @@ export function prettierLeftovers(config: Record<string, unknown>): string[] {
   return [
     ...Object.keys(config).filter((key) => !carried.has(key)),
     ...prettierPlugins(config)
-      .filter((plugin) => plugin !== TAILWIND_PLUGIN)
+      .filter((plugin) => plugin !== TAILWIND_PLUGIN && FRAMEWORK_PLUGINS[plugin] === undefined)
       .map((plugin) => `plugin ${plugin}`),
-    ...(config.endOfLine !== undefined && !OXFMT_LINE_ENDINGS.has(String(config.endOfLine))
-      ? [`endOfLine: ${String(config.endOfLine)}`]
+    ...(config.endOfLine !== undefined && !isOxfmtLineEnding(config.endOfLine)
+      ? [`endOfLine: ${JSON.stringify(config.endOfLine)}`]
       : []),
   ]
 }
@@ -246,6 +263,23 @@ export function recommendFormatterConfig(
     settings.sortPackageJson ??= true
   }
 
+  // oxfmt formats `.svelte` and `.astro` files only with these options on, and only with
+  // the compiler each plugin loads at run time, which oxfmt does not bundle: without it,
+  // every format run fails. So the option is written only when that package is installed,
+  // and otherwise reported as a prerequisite. A project already formatted by Biome or by
+  // Prettier without the plugin has never had these files formatted, so they are not
+  // switched on for it either; that would reformat them wholesale on the first run.
+  for (const framework of ['svelte', 'astro'] as const) {
+    const formatsFiles =
+      stack.sourceExtensions.includes(`.${framework}`) && hasFrameworkFormatter(stack, framework)
+
+    if (!formatsFiles) {
+      delete settings[framework]
+    } else if (existing === undefined) {
+      settings[framework] ??= true
+    }
+  }
+
   // The one ignore list written: minified files, found on disk, which `oxfmt --write` would
   // otherwise expand and `--check` would fail on.
   const minified = minifiedIgnorePatterns(stack)
@@ -259,5 +293,13 @@ export function recommendFormatterConfig(
 
 /** Every oxfmt key this tool can write, for the inventory conformance check. */
 export function getRecommendableFormatterKeys(): string[] {
-  return [...PRETTIER_KEYS, 'ignorePatterns', 'sortImports', 'sortPackageJson', 'sortTailwindcss']
+  return [
+    ...PRETTIER_KEYS,
+    'astro',
+    'ignorePatterns',
+    'sortImports',
+    'sortPackageJson',
+    'sortTailwindcss',
+    'svelte',
+  ]
 }
