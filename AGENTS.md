@@ -60,7 +60,9 @@ review the diff; never edit a `docs/*.tsv` by hand.
 **The merger only ever adds.** [src/config-merger.ts](src/config-merger.ts) never removes a field,
 never lowers a severity, and treats an explicit `"off"` as a decision to report rather than
 overwrite. This is what makes the tool safe to run repeatedly against a config someone else
-maintains. Any change here needs the invariant tests in `config-merger.test.ts` to still hold.
+maintains. Anything that narrows a check - an evidence-backed `off`, rule options, a
+test-file override - is written only into a gap, never over a value the project set. Any
+change here needs the invariant tests in `config-merger.test.ts` to still hold.
 
 **The custom plugins supplement the built-in rules; they never replace them.** Whenever a stack
 earns a js-plugin it must also earn Oxlint's built-in plugin for the same ground, and a rule is
@@ -87,7 +89,10 @@ wanted but unavailable, it becomes a `Prerequisite`, not a `Recommendation`.
 **Levels are a ladder, and each rung is a superset of the one below.** `basic` ⊂
 `recommended` ⊂ `strict` ⊂ `paranoid`, asserted directly in `rule-recommender.test.ts`.
 Adding a rule at a lower level therefore adds it to every level above. `nursery` is never
-enabled - its rules are unstable upstream and would break determinism.
+enabled, nor any rule from it named - its rules are unstable upstream and would break
+determinism. A category runs every rule in it, type-aware ones too once `typeAware` is on, so
+a rule is listed at the level where its category starts it; `conformance.test.ts` fails on a
+row named above that level.
 
 **Flags assert signals; they do not bypass the engine.** `--react` adds a `flag` evidence
 entry via `withForcedSignals` and then travels the same path a detected signal would, so
