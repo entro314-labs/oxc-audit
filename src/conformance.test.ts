@@ -229,6 +229,24 @@ describe('rule options', () => {
   })
 })
 
+describe('minified files', () => {
+  it('keeps a vendored minified file out of both the linter and the formatter', async () => {
+    const dir = await setupProject({
+      ...REACT_PROJECT,
+      'public/worker.js': `!function(){${'debugger;var a=1;'.repeat(100)}}()\n`,
+    })
+
+    await audit({ projectDir: dir, write: true })
+    const { stdout } = await run(['--config', '.oxlintrc.json', '.'], dir)
+    const formatter = JSON.parse(await readFile(join(dir, '.oxfmtrc.jsonc'), 'utf-8')) as {
+      ignorePatterns?: string[]
+    }
+
+    expect(stdout).not.toContain('public/worker.js')
+    expect(formatter.ignorePatterns).toEqual(['public/worker.js'])
+  })
+})
+
 describe('environments', () => {
   it('lets no-implied-eval see a bare setTimeout once the environment is declared', async () => {
     const dir = await setupProject({
@@ -504,6 +522,7 @@ describe('recommendations never weaken a rule its category already enables', () 
     sourceExtensions: ['.ts', '.tsx', '.vue'],
     filesScanned: 3,
     scanTruncated: false,
+    minifiedFiles: [],
   }
 
   const requests: AuditRequest[] = [

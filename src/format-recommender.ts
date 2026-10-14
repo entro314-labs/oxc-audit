@@ -1,3 +1,4 @@
+import { minifiedIgnorePatterns } from './rule-recommender.js'
 import { hasSignal } from './stack-detector.js'
 import type { OxfmtConfig, ProjectStack } from './types.js'
 
@@ -227,8 +228,9 @@ export function fromBiome(config: {
  * formatted that way, and imposing different defaults would rewrite every file on the first
  * run. Defaults only fill in what nothing has an opinion about.
  *
- * `ignorePatterns` is never written. oxfmt already respects `.gitignore`, and a guessed
- * ignore list is how a formatter quietly stops covering part of a codebase.
+ * `ignorePatterns` is written only for minified files the scan found. oxfmt already
+ * respects `.gitignore`, and a guessed ignore list is how a formatter quietly stops
+ * covering part of a codebase.
  */
 export function recommendFormatterConfig(
   stack: ProjectStack,
@@ -244,10 +246,18 @@ export function recommendFormatterConfig(
     settings.sortPackageJson ??= true
   }
 
+  // The one ignore list written: minified files, found on disk, which `oxfmt --write` would
+  // otherwise expand and `--check` would fail on.
+  const minified = minifiedIgnorePatterns(stack)
+
+  if (minified.length > 0) {
+    settings.ignorePatterns ??= minified
+  }
+
   return settings
 }
 
 /** Every oxfmt key this tool can write, for the inventory conformance check. */
 export function getRecommendableFormatterKeys(): string[] {
-  return [...PRETTIER_KEYS, 'sortImports', 'sortPackageJson', 'sortTailwindcss']
+  return [...PRETTIER_KEYS, 'ignorePatterns', 'sortImports', 'sortPackageJson', 'sortTailwindcss']
 }

@@ -186,12 +186,17 @@ export interface ProjectStack {
   filesScanned: number
   /** True when the scan stopped at the file budget rather than exhausting the tree. */
   scanTruncated: boolean
+  /**
+   * Scanned JavaScript files that are minified - a line over 1,000 characters - relative to
+   * the project, with `/` separators. Generated or vendored code no rule was written for.
+   */
+  minifiedFiles: string[]
 }
 
 /** A single recommended change to the Oxlint config, with its justification. */
 export interface Recommendation {
-  kind: 'plugin' | 'js-plugin' | 'category' | 'rule' | 'option' | 'env'
-  /** Plugin name, category name, rule name, `options` key, or `env` name. */
+  kind: 'plugin' | 'js-plugin' | 'category' | 'rule' | 'option' | 'env' | 'ignore'
+  /** Plugin name, category name, rule name, `options` key, `env` name, or ignore pattern. */
   target: string
   /** Severity for category/rule recommendations. */
   severity?: OxlintSeverity

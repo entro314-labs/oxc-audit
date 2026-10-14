@@ -193,6 +193,21 @@ describe('detectStack', () => {
   })
 })
 
+describe('detectStack - minified files', () => {
+  it('records JavaScript with a line over 1,000 characters, and nothing hand-written', async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({ name: 'app' }),
+      'public/worker.js': `!function(){${'var a=1;'.repeat(200)}}()\n`,
+      'public/sw.js': 'self.addEventListener("fetch", () => {})\n',
+      'src/long.ts': `export const s = "${'x'.repeat(2000)}"\n`,
+    })
+
+    const stack = await detectStack(dir, new CollectingReporter())
+
+    expect(stack.minifiedFiles).toEqual(['public/worker.js'])
+  })
+})
+
 describe('detectStack - workspace roots', () => {
   it('detects a pnpm workspace, which declares itself outside package.json', async () => {
     const dir = await setupProject({

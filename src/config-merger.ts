@@ -105,6 +105,16 @@ function applyRecommendation(
     return applyEnv(config, recommendation.target)
   }
 
+  if (recommendation.kind === 'ignore') {
+    if (config.ignorePatterns?.includes(recommendation.target) === true) {
+      return 'satisfied'
+    }
+
+    config.ignorePatterns = [...(config.ignorePatterns ?? []), recommendation.target]
+
+    return 'applied'
+  }
+
   const severity = recommendation.severity ?? 'warn'
 
   if (recommendation.files !== undefined) {

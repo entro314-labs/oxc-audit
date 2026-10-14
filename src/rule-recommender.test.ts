@@ -18,6 +18,7 @@ function stackOf(signals: Array<StackSignalId | [StackSignalId, EvidenceKind]>):
     sourceExtensions: ['.ts'],
     filesScanned: 1,
     scanTruncated: false,
+    minifiedFiles: [],
   }
 }
 
@@ -245,12 +246,17 @@ describe('the one recommended off', () => {
     expect(off(['react', 'jsx'])).toBeUndefined()
   })
 
-  it('is the only top-level off the recommender ever emits', () => {
+  it('is, with the measured noise rules, the only top-level off the recommender emits', () => {
     const offs = recommendForStack(stackOf(FULL_STACK_WITH_RUNTIME), request({ maximal: true }))
       .filter(({ severity, files }) => severity === 'off' && files === undefined)
       .map(({ target }) => target)
 
-    expect(offs).toEqual(['react/react-in-jsx-scope'])
+    expect(offs.sort()).toEqual([
+      'no-underscore-dangle',
+      'react/react-in-jsx-scope',
+      'unicorn/consistent-function-scoping',
+      'vitest/require-mock-type-parameters',
+    ])
   })
 
   it('needs suspicious to be on, since basic never enables the rule', () => {
@@ -491,5 +497,23 @@ describe('test files', () => {
     ).filter(({ files }) => files !== undefined)
 
     expect(scoped.every(({ severity }) => severity === 'off')).toBe(true)
+  })
+})
+
+describe('minified files', () => {
+  const ignores = (minifiedFiles: string[]): string[] =>
+    recommendForStack({ ...stackOf(['esm']), minifiedFiles })
+      .filter(({ kind }) => kind === 'ignore')
+      .map(({ target }) => target)
+
+  it('names each minified file and folds every .min.js into one glob', () => {
+    expect(ignores(['public/worker.js', 'a.min.js', 'lib/b.min.js'])).toEqual([
+      '**/*.min.js',
+      'public/worker.js',
+    ])
+  })
+
+  it('ignores nothing when nothing minified was found', () => {
+    expect(ignores([])).toEqual([])
   })
 })

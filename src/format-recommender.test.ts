@@ -17,6 +17,7 @@ const STACK: ProjectStack = {
   sourceExtensions: ['.ts'],
   filesScanned: 1,
   scanTruncated: false,
+  minifiedFiles: [],
 }
 
 describe('carrying settings across from Prettier', () => {
@@ -120,8 +121,14 @@ describe('the recommended formatter config', () => {
     expect(config.sortImports).toBeDefined()
   })
 
-  it('never writes an ignore list, which would quietly narrow what gets formatted', () => {
+  it('writes an ignore list only for minified files the scan found', () => {
     expect(recommendFormatterConfig(STACK, undefined).ignorePatterns).toBeUndefined()
+    expect(
+      recommendFormatterConfig(
+        { ...STACK, minifiedFiles: ['public/worker.js', 'vendor/a.min.js'] },
+        undefined,
+      ).ignorePatterns,
+    ).toEqual(['**/*.min.js', 'public/worker.js'])
   })
 })
 

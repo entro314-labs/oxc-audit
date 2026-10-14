@@ -389,3 +389,27 @@ describe('mergeRecommendations - rules scoped to files', () => {
     expect(mergeRecommendations(first.config, recommendations).changed).toBe(false)
   })
 })
+
+describe('mergeRecommendations - ignore patterns', () => {
+  const ignore = (target: string): Recommendation => ({
+    kind: 'ignore',
+    target,
+    reason: 'test',
+    triggeredBy: [],
+  })
+
+  it('appends a pattern and keeps the ones already there', () => {
+    const { config } = mergeRecommendations({ ignorePatterns: ['/dist'] }, [
+      ignore('public/worker.js'),
+    ])
+
+    expect(config.ignorePatterns).toEqual(['/dist', 'public/worker.js'])
+  })
+
+  it('is satisfied by the same pattern', () => {
+    expect(
+      mergeRecommendations({ ignorePatterns: ['public/worker.js'] }, [ignore('public/worker.js')])
+        .changed,
+    ).toBe(false)
+  })
+})

@@ -1,5 +1,5 @@
-import { readdir } from 'node:fs/promises'
-import { extname, join, resolve } from 'node:path'
+import { open, readdir } from 'node:fs/promises'
+import { extname, join, relative, resolve, sep } from 'node:path'
 
 import { z } from 'zod'
 
@@ -212,6 +212,7 @@ export async function detectStack(
     sourceExtensions: [...scan.extensions].sort(),
     filesScanned: scan.filesScanned,
     scanTruncated: scan.truncated,
+    minifiedFiles: scan.minified,
   }
 }
 
@@ -398,11 +399,39 @@ interface SourceScan {
   extensions: Set<string>
   filesScanned: number
   truncated: boolean
+  minified: string[]
+}
+
+const JAVASCRIPT_EXTENSIONS = new Set(['.js', '.mjs', '.cjs'])
+
+/** Longest line hand-written code plausibly has; minifiers emit far longer ones. */
+const MINIFIED_LINE_LENGTH = 1000
+
+/**
+ * True when the file opens with a line longer than {@link MINIFIED_LINE_LENGTH}. Only the
+ * first 64 KiB is read: a minified file is long-lined from its first statement.
+ */
+async function isMinified(path: string): Promise<boolean> {
+  const handle = await open(path, 'r')
+
+  try {
+    const buffer = Buffer.alloc(64 * 1024)
+    const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
+
+    return buffer
+      .subarray(0, bytesRead)
+      .toString('utf-8')
+      .split('\n')
+      .some((line) => line.length > MINIFIED_LINE_LENGTH)
+  } finally {
+    await handle.close()
+  }
 }
 
 /** Walks the source tree breadth-first, collecting which source extensions exist. */
 async function scanSourceTree(projectDir: string, maxFiles: number): Promise<SourceScan> {
   const extensions = new Set<string>()
+  const minified: string[] = []
   const queue: string[] = [projectDir]
   let filesScanned = 0
 
@@ -443,11 +472,16 @@ async function scanSourceTree(projectDir: string, maxFiles: number): Promise<Sou
         extensions.add(extension)
       }
 
+      const path = join(currentDir, entry.name)
+      if (JAVASCRIPT_EXTENSIONS.has(extension) && (await isMinified(path))) {
+        minified.push(relative(projectDir, path).split(sep).join('/'))
+      }
+
       if (filesScanned >= maxFiles) {
-        return { extensions, filesScanned, truncated: true }
+        return { extensions, filesScanned, truncated: true, minified: minified.sort() }
       }
     }
   }
 
-  return { extensions, filesScanned, truncated: false }
+  return { extensions, filesScanned, truncated: false, minified: minified.sort() }
 }

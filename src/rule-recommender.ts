@@ -120,6 +120,20 @@ const ENV_RULES: Array<{ env: string; requires: StackSignalId[]; reason: string 
   },
 ]
 
+/**
+ * Ignore patterns for the minified files the scan found.
+ *
+ * Linting generated or vendored code reports thousands of findings nobody will fix - one
+ * minified worker in `public/` produced 45,000 of a project's 46,000. Every `.min.js`
+ * collapses into one glob; any other minified file is named exactly, so nothing
+ * hand-written is caught by a pattern broader than the evidence.
+ */
+export function minifiedIgnorePatterns(stack: ProjectStack): string[] {
+  const named = stack.minifiedFiles.filter((path) => !path.endsWith('.min.js'))
+
+  return [...(stack.minifiedFiles.length > named.length ? ['**/*.min.js'] : []), ...named]
+}
+
 /** Where each level sits on the ladder, so `>=` comparisons read the way they mean. */
 const LEVEL_RANK: Record<AuditLevel, number> = {
   basic: 0,
@@ -257,7 +271,7 @@ const TARGETED_RULES: Array<{
     reason: '`javascript:` in a JSX href executes on click in the page origin.',
   },
   {
-    // The one `off` this tool writes. `suspicious` carries `react-in-jsx-scope`, which demands
+    // An `off` on evidence the rule cannot apply. `suspicious` carries `react-in-jsx-scope`, which demands
     // a `React` binding the automatic runtime never needs, so on a React 17+ project the
     // `recommended` config would report every component file. Oxlint has no runtime setting
     // that quietens it, so the rule is turned off on the evidence that it cannot apply. Any
@@ -334,6 +348,33 @@ const TARGETED_RULES: Array<{
     ],
     reason:
       'An import kept only for its side effects, allowing stylesheets and the modules that exist to be imported that way.',
+  },
+  // Three more `off`s, for rules Oxlint's categories enable that were measured as noise
+  // across real projects: almost every finding was an idiom, not a defect. Written only into
+  // a gap, so a project that wants one of them keeps it.
+  {
+    rule: 'unicorn/consistent-function-scoping',
+    level: 'recommended',
+    severity: 'off',
+    requires: [],
+    reason:
+      'Reports every helper defined inside a component or closure, with no fix; on real projects that was nearly all it found.',
+  },
+  {
+    rule: 'no-underscore-dangle',
+    level: 'recommended',
+    severity: 'off',
+    requires: [],
+    reason:
+      'Reports the `_private` naming convention and injected globals such as `__SW_MANIFEST`, which is all it found on real projects.',
+  },
+  {
+    rule: 'vitest/require-mock-type-parameters',
+    level: 'basic',
+    severity: 'off',
+    requires: ['vitest'],
+    reason:
+      'Reports every untyped `vi.fn()`. A typing preference that Oxlint files under correctness, so it would run even at --basic.',
   },
   {
     rule: 'typescript/no-explicit-any',
@@ -1237,6 +1278,16 @@ export function recommendForStack(
     if (triggeredBy.length > 0) {
       recommendations.push({ kind: 'plugin', target: plugin, reason, triggeredBy })
     }
+  }
+
+  for (const pattern of minifiedIgnorePatterns(stack)) {
+    recommendations.push({
+      kind: 'ignore',
+      target: pattern,
+      reason:
+        'Minified - a line over 1,000 characters - so generated or vendored code that no rule here was written for.',
+      triggeredBy: [],
+    })
   }
 
   for (const { env, requires, reason } of ENV_RULES) {
