@@ -245,9 +245,9 @@ describe('the one recommended off', () => {
     expect(off(['react', 'jsx'])).toBeUndefined()
   })
 
-  it('is the only off the recommender ever emits', () => {
+  it('is the only top-level off the recommender ever emits', () => {
     const offs = recommendForStack(stackOf(FULL_STACK_WITH_RUNTIME), request({ maximal: true }))
-      .filter(({ severity }) => severity === 'off')
+      .filter(({ severity, files }) => severity === 'off' && files === undefined)
       .map(({ target }) => target)
 
     expect(offs).toEqual(['react/react-in-jsx-scope'])
@@ -464,5 +464,32 @@ describe('environments', () => {
 
   it('declares nothing without evidence', () => {
     expect(envs(['typescript', 'esm'])).toEqual([])
+  })
+})
+
+describe('test files', () => {
+  const exemptions = (signals: StackSignalId[]): string[] =>
+    recommendForStack(stackOf(signals))
+      .filter(({ files }) => files !== undefined)
+      .map(({ target }) => target)
+
+  it('turns the no-unsafe rules off in tests, where mocks are any by construction', () => {
+    expect(exemptions(['typescript', 'tsconfig', 'tsgolint', 'vitest'])).toContain(
+      'typescript/no-unsafe-call',
+    )
+  })
+
+  it('exempts nothing without a test runner or without type-aware rules', () => {
+    expect(exemptions(['typescript', 'tsconfig', 'tsgolint'])).toEqual([])
+    expect(exemptions(['typescript', 'tsconfig', 'vitest'])).toEqual([])
+  })
+
+  it('only ever relaxes rules in tests, never adds them', () => {
+    const scoped = recommendForStack(
+      stackOf(['typescript', 'tsconfig', 'tsgolint', 'vitest', 'jest']),
+      request({ maximal: true }),
+    ).filter(({ files }) => files !== undefined)
+
+    expect(scoped.every(({ severity }) => severity === 'off')).toBe(true)
   })
 })

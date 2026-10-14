@@ -342,6 +342,33 @@ describe('type-aware linting', () => {
     expect(misused[0]).toContain('b.tsx:5')
   })
 
+  it('keeps the no-unsafe rules for source but not for tests, wherever the tests live', async () => {
+    const unsafe = 'declare const m: any\nexport const v: number = m.value\n'
+    const dir = await setupProject({
+      ...TYPE_AWARE_PROJECT,
+      'package.json': JSON.stringify({
+        name: 'app',
+        type: 'module',
+        devDependencies: { typescript: '^5.0.0', 'oxlint-tsgolint': '^7.0.2001', vitest: '^3' },
+      }),
+      'src/a.ts': unsafe,
+      'src/a.test.ts': unsafe,
+      'src/__tests__/b.ts': unsafe,
+      'tests/c.ts': unsafe,
+    })
+
+    await audit({ projectDir: dir, write: true })
+    const { stdout } = await run(['--config', '.oxlintrc.json', '--type-aware', '.'], dir)
+    const files = new Set(
+      stdout
+        .split('\n')
+        .filter((line) => line.includes('no-unsafe'))
+        .map((line) => line.split(':')[0]),
+    )
+
+    expect([...files]).toEqual(['src/a.ts'])
+  })
+
   it('reports type-aware as a prerequisite instead of configuring it when the engine is absent', async () => {
     const dir = await setupProject({
       'package.json': JSON.stringify({ name: 'app', devDependencies: { typescript: '^5.0.0' } }),

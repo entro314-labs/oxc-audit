@@ -1023,6 +1023,28 @@ const TYPE_AWARE_RULES: Array<{
 ]
 
 /**
+ * Test files, as the two runners find them by default.
+ */
+const TEST_FILES = ['**/*.test.*', '**/*.spec.*', '**/__tests__/**', '**/tests/**', '**/test/**']
+
+/**
+ * Type-aware rules turned off in test files.
+ *
+ * Mocks are `any` by construction - `vi.fn()` and `jest.fn()` return one unless given type
+ * parameters - so every call, property read and assertion on a mock is reported. Measured
+ * across real projects, test files produced over ninety percent of these rules' findings,
+ * almost none of them defects. Source files keep the rules.
+ */
+const TEST_FILE_EXEMPTIONS = [
+  'typescript/no-unsafe-argument',
+  'typescript/no-unsafe-assignment',
+  'typescript/no-unsafe-call',
+  'typescript/no-unsafe-member-access',
+  'typescript/no-unsafe-return',
+  'typescript/no-unsafe-type-assertion',
+]
+
+/**
  * The js plugins shipped in `@entro314labs/oxlint-audit-plugins`, and the stacks each one covers.
  *
  * These are custom plugins rather than built-ins, so they are loaded by path through
@@ -1320,6 +1342,21 @@ export function recommendForStack(
         triggeredBy: ['tsgolint'],
       })
     }
+
+    const testRunners = (['vitest', 'jest'] as const).filter((signal) => hasSignal(stack, signal))
+
+    if (typeAware.length > 0 && testRunners.length > 0) {
+      for (const rule of TEST_FILE_EXEMPTIONS) {
+        recommendations.push({
+          kind: 'rule',
+          target: rule,
+          severity: 'off',
+          files: TEST_FILES,
+          reason: 'Mocks are `any` by construction, so in tests this reports every use of one.',
+          triggeredBy: [...testRunners, 'tsgolint'],
+        })
+      }
+    }
   }
 
   for (const { plugin, reason, rules, triggeredBy } of auditPlugins) {
@@ -1408,7 +1445,11 @@ export function getTypeAwareRuleNames(): string[] {
 
 /** Every Oxlint rule name this recommender can emit, for inventory conformance checks. */
 export function getRecommendableRuleNames(): string[] {
-  return [...TARGETED_RULES.map(({ rule }) => rule), ...TYPE_AWARE_RULES.map(({ rule }) => rule)]
+  return [
+    ...TARGETED_RULES.map(({ rule }) => rule),
+    ...TYPE_AWARE_RULES.map(({ rule }) => rule),
+    ...TEST_FILE_EXEMPTIONS,
+  ]
 }
 
 /** Every plugin this recommender can enable. */

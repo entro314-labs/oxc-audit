@@ -12,6 +12,7 @@ All notable changes to this project will be documented in this file.
   - `no-unused-vars` honours the `_` prefix for arguments, variables, caught errors and array-destructuring slots (`[_, value]`), and removes unused imports under `--fix`.
   - `vitest/valid-title` and `jest/valid-title` accept a function or class as a suite name.
   - `import/no-unassigned-import` allows stylesheets and modules imported only for their effect, such as `server-only` and `dotenv/config`.
+- With type-aware rules on and Vitest or Jest present, the config adds an override that turns the `typescript/no-unsafe-*` rules off in test files (`*.test.*`, `*.spec.*`, `__tests__/`, `tests/`, `test/`). Mocks are `any` by construction, and on the projects measured, test files produced over 90% of these rules' findings. Source files keep them. The override is not added when the project already set one of those rules itself.
 - `--ts-config` creates `oxlint.config.ts` (`export default defineConfig({...})`) instead of `.oxlintrc.json` when the project has no Oxlint config. An existing `oxlint.config.ts` or `.mts` is now audited and updated in place, where previously any module config blocked the run. A module config that does more than export a plain object (other imports, `extends`, computed values) is reported but not rewritten.
 
 ### Changed
