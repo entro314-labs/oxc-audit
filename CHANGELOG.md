@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- A project with no `packageManager` field was always told to run `pnpm add -D`, even with a `package-lock.json`, `yarn.lock` or `bun.lock` beside its manifest. The lockfile now decides, and the pnpm default applies only when there is none.
 - A `pnpm-workspace.yaml` holding only settings (`minimumReleaseAge`, `allowBuilds`), which pnpm 10+ uses in single-package projects, made the project count as a workspace root and printed the "frameworks used in individual packages will be missed" warning. Only a file with a `packages` list counts now.
 - An existing root-anchored `ignorePatterns` entry such as `"/dist"` was reported as an absolute path and blocked `--write`. Oxlint reads it gitignore-style, anchored to the config directory, so it is now accepted; a leading `/` in `overrides` globs, where it matches nothing, is still reported.
 - A Prettier `endOfLine: "auto"` or Biome `lineEnding: "auto"` was copied into `.oxfmtrc.jsonc`, which oxfmt refuses to load, so every `format` and `format:check` run failed. It is left behind and reported.

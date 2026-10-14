@@ -103,6 +103,8 @@ export async function updatePackageJson(
     typeAware: boolean
     format: boolean
     jsPlugins: boolean
+    /** From the manifest's `packageManager` field, or else its lockfile. */
+    packageManager: string | undefined
     signal?: AbortSignal
   },
 ): Promise<PackageUpdate | undefined> {
@@ -162,8 +164,7 @@ export async function updatePackageJson(
       ? [{ tool, range: range ?? '', needed }]
       : []
   })
-  const packageManager =
-    typeof manifest.packageManager === 'string' ? manifest.packageManager : undefined
+  const { packageManager } = options
 
   let written = false
 

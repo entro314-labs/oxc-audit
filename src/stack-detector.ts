@@ -1,5 +1,5 @@
 import { open, readdir } from 'node:fs/promises'
-import { extname, join, relative, resolve, sep } from 'node:path'
+import { dirname, extname, join, relative, resolve, sep } from 'node:path'
 
 import { z } from 'zod'
 
@@ -208,7 +208,11 @@ export async function detectStack(
   return {
     projectDir: resolvedDir,
     packageJsonPath,
-    packageManager: manifest?.packageManager,
+    packageManager:
+      manifest?.packageManager ??
+      (await packageManagerFromLockfile(
+        packageJsonPath === undefined ? resolvedDir : dirname(packageJsonPath),
+      )),
     signals,
     sourceExtensions: [...scan.extensions].sort(),
     filesScanned: scan.filesScanned,
@@ -234,6 +238,32 @@ export function hasFrameworkFormatter(stack: ProjectStack, framework: 'svelte' |
           (kind === 'dependency' || kind === 'dev-dependency') && value === 'svelte',
       ),
   )
+}
+
+/** Lockfiles, and the package manager that writes each. */
+const LOCKFILES: Array<[string, string]> = [
+  ['pnpm-lock.yaml', 'pnpm'],
+  ['package-lock.json', 'npm'],
+  ['yarn.lock', 'yarn'],
+  ['bun.lock', 'bun'],
+  ['bun.lockb', 'bun'],
+]
+
+/**
+ * The package manager a lockfile beside the manifest names, for a manifest with no
+ * `packageManager` field, so install commands are not written for a tool the project does
+ * not use. Undefined when there is no lockfile, or more than one kind.
+ */
+async function packageManagerFromLockfile(dir: string): Promise<string | undefined> {
+  const found = new Set<string>()
+
+  for (const [file, manager] of LOCKFILES) {
+    if (await pathExists(join(dir, file))) {
+      found.add(manager)
+    }
+  }
+
+  return found.size === 1 ? [...found][0] : undefined
 }
 
 /** True when the stack carries the given signal. */

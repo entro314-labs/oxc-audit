@@ -237,6 +237,7 @@ async function runAudit(
         typeAware: merge.config.options?.typeAware === true,
         format: options.format !== false,
         jsPlugins: (merge.config.jsPlugins ?? []).length > 0,
+        packageManager: stack.packageManager,
         signal: options.signal,
       })
 

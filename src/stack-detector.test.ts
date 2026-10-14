@@ -193,6 +193,32 @@ describe('detectStack', () => {
   })
 })
 
+describe('detectStack - package manager', () => {
+  it('reads it from the lockfile when the manifest does not name one', async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({ name: 'app' }),
+      'package-lock.json': '{}',
+    })
+
+    expect((await detectStack(dir, new CollectingReporter())).packageManager).toBe('npm')
+  })
+
+  it('prefers the manifest field, and names nothing when lockfiles disagree', async () => {
+    const named = await setupProject({
+      'package.json': JSON.stringify({ name: 'app', packageManager: 'yarn@4.5.0' }),
+      'package-lock.json': '{}',
+    })
+    const mixed = await setupProject({
+      'package.json': JSON.stringify({ name: 'app' }),
+      'package-lock.json': '{}',
+      'yarn.lock': '',
+    })
+
+    expect((await detectStack(named, new CollectingReporter())).packageManager).toBe('yarn@4.5.0')
+    expect((await detectStack(mixed, new CollectingReporter())).packageManager).toBeUndefined()
+  })
+})
+
 describe('detectStack - minified files', () => {
   it('records JavaScript with a line over 1,000 characters, and nothing hand-written', async () => {
     const dir = await setupProject({
