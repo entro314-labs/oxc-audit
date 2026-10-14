@@ -193,6 +193,30 @@ describe('detectStack', () => {
   })
 })
 
+describe('detectStack - JSX runtime', () => {
+  it("reads the automatic runtime off tsconfig's jsx when react is a dist-tag", async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({ name: 'app', dependencies: { react: 'next' } }),
+      'tsconfig.json': '{\n  // comment\n  "compilerOptions": { "jsx": "react-jsx" }\n}\n',
+    })
+
+    expect(hasSignal(await detectStack(dir, new CollectingReporter()), 'react-jsx-runtime')).toBe(
+      true,
+    )
+  })
+
+  it('finds no automatic runtime in a classic jsx setting', async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({ name: 'app', dependencies: { react: 'next' } }),
+      'tsconfig.json': '{ "compilerOptions": { "jsx": "react" } }',
+    })
+
+    expect(hasSignal(await detectStack(dir, new CollectingReporter()), 'react-jsx-runtime')).toBe(
+      false,
+    )
+  })
+})
+
 describe('detectStack - package manager', () => {
   it('reads it from the lockfile when the manifest does not name one', async () => {
     const dir = await setupProject({

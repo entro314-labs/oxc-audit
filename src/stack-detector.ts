@@ -1,6 +1,7 @@
-import { open, readdir } from 'node:fs/promises'
+import { open, readdir, readFile } from 'node:fs/promises'
 import { dirname, extname, join, relative, resolve, sep } from 'node:path'
 
+import { parse as parseJsonc } from 'jsonc-parser'
 import { z } from 'zod'
 
 import {
@@ -180,6 +181,7 @@ export async function detectStack(
   const scan = await scanSourceTree(resolvedDir, options.maxFiles ?? DEFAULT_MAX_FILES)
   collectExtensionSignals(scan.extensions, addEvidence)
   collectJsxRuntimeSignal(manifest, evidenceBySignal.get('nextjs'), addEvidence)
+  await collectTsconfigJsxSignal(resolvedDir, addEvidence)
 
   // Dependency signals come from one manifest. In a workspace root the frameworks live in
   // the leaf packages, so a root-level audit under-reports and the user needs to know.
@@ -429,6 +431,38 @@ function collectJsxRuntimeSignal(
 
   for (const evidence of nextjsEvidence ?? []) {
     addEvidence('react-jsx-runtime', evidence)
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+/**
+ * The automatic JSX runtime, read off `compilerOptions.jsx` in the project's own
+ * `tsconfig.json`. `react-jsx` and `react-jsxdev` compile every element against
+ * `react/jsx-runtime`, whatever the declared `react` range says - a dist-tag like `next`
+ * cannot be reduced to a version, but the compiler setting is the fact itself.
+ */
+async function collectTsconfigJsxSignal(
+  projectDir: string,
+  addEvidence: (id: StackSignalId, evidence: Evidence) => void,
+): Promise<void> {
+  const path = join(projectDir, 'tsconfig.json')
+
+  if (!(await pathExists(path))) {
+    return
+  }
+
+  const tsconfig: unknown = parseJsonc(await readFile(path, 'utf-8'))
+  const compilerOptions: unknown = isRecord(tsconfig) ? tsconfig.compilerOptions : undefined
+  const jsx = isRecord(compilerOptions) ? compilerOptions.jsx : undefined
+
+  if (jsx === 'react-jsx' || jsx === 'react-jsxdev') {
+    addEvidence('react-jsx-runtime', {
+      kind: 'tsconfig-field',
+      value: `tsconfig.json#compilerOptions.jsx=${jsx}`,
+    })
   }
 }
 
