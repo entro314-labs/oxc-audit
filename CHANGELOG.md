@@ -17,6 +17,7 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 
+- An existing root-anchored `ignorePatterns` entry such as `"/dist"` was reported as an absolute path and blocked `--write`. Oxlint reads it gitignore-style, anchored to the config directory, so it is now accepted; a leading `/` in `overrides` globs, where it matches nothing, is still reported.
 - A Prettier `endOfLine: "auto"` or Biome `lineEnding: "auto"` was copied into `.oxfmtrc.jsonc`, which oxfmt refuses to load, so every `format` and `format:check` run failed. It is left behind and reported.
 - A project formatted with Prettier's or Biome's defaults was reformatted wholesale on the first oxfmt run, because oxfmt wraps at 100 columns where both wrap at 80, and Biome indents with tabs. Those defaults are now pinned when the source config leaves them unset and `.editorconfig` sets no `max_line_length`.
 

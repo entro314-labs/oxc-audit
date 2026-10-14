@@ -17,14 +17,24 @@ export function validateOxlintConfig(oxlintConfig: OxlintConfig): string[] {
 interface PatternGroup {
   field: string
   patterns: string[] | undefined
+  /**
+   * `ignorePatterns` are gitignore-style, where a leading `/` anchors the pattern to the
+   * config directory. `overrides` globs have no such form, so a leading `/` there matches
+   * nothing.
+   */
+  rootAnchorAllowed: boolean
 }
 
 function collectOxlintPatternGroups(config: OxlintConfig): PatternGroup[] {
   return [
-    { field: 'ignorePatterns', patterns: config.ignorePatterns },
+    { field: 'ignorePatterns', patterns: config.ignorePatterns, rootAnchorAllowed: true },
     ...(config.overrides ?? []).flatMap((override, index) => [
-      { field: `overrides[${index}].files`, patterns: override.files },
-      { field: `overrides[${index}].excludeFiles`, patterns: override.excludeFiles },
+      { field: `overrides[${index}].files`, patterns: override.files, rootAnchorAllowed: false },
+      {
+        field: `overrides[${index}].excludeFiles`,
+        patterns: override.excludeFiles,
+        rootAnchorAllowed: false,
+      },
     ]),
   ]
 }
@@ -32,9 +42,9 @@ function collectOxlintPatternGroups(config: OxlintConfig): PatternGroup[] {
 function validatePatternGroups(configName: string, groups: PatternGroup[]): string[] {
   const problems: string[] = []
 
-  for (const { field, patterns } of groups) {
+  for (const { field, patterns, rootAnchorAllowed } of groups) {
     for (const pattern of patterns ?? []) {
-      const problem = findPatternProblem(pattern)
+      const problem = findPatternProblem(pattern, rootAnchorAllowed)
 
       if (problem) {
         problems.push(`${configName}: ${field} pattern "${pattern}" ${problem}`)
@@ -45,14 +55,14 @@ function validatePatternGroups(configName: string, groups: PatternGroup[]): stri
   return problems
 }
 
-function findPatternProblem(pattern: string): string | undefined {
+function findPatternProblem(pattern: string, rootAnchorAllowed: boolean): string | undefined {
   const body = pattern.startsWith('!') ? pattern.slice(1) : pattern
 
   if (body.split('/').includes('..')) {
     return 'escapes the config directory with "..", which Oxlint rejects'
   }
 
-  if (body.startsWith('/') || /^[A-Za-z]:[/\\]/u.test(body)) {
+  if ((body.startsWith('/') && !rootAnchorAllowed) || /^[A-Za-z]:[/\\]/u.test(body)) {
     return 'is an absolute path, but patterns are resolved within the config directory'
   }
 
