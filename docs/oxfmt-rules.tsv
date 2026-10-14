@@ -1,6 +1,9 @@
 option	scope
 arrowParens	override.options
 arrowParens	top-level
+associations	top-level
+astro	override.options
+astro	top-level
 bracketSameLine	override.options
 bracketSameLine	top-level
 bracketSpacing	override.options
@@ -9,6 +12,8 @@ embeddedLanguageFormatting	override.options
 embeddedLanguageFormatting	top-level
 endOfLine	override.options
 endOfLine	top-level
+experimentalOperatorPosition	override.options
+experimentalOperatorPosition	top-level
 htmlWhitespaceSensitivity	override.options
 htmlWhitespaceSensitivity	top-level
 ignorePatterns	top-level

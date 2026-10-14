@@ -33,6 +33,7 @@ typescript/no-extra-non-null-assertion	no	n/a
 typescript/no-extraneous-class	no	n/a
 typescript/no-floating-promises	yes	implemented
 typescript/no-for-in-array	yes	implemented
+typescript/no-generated-empty-object-type	yes	implemented
 typescript/no-implied-eval	yes	implemented
 typescript/no-import-type-side-effects	no	n/a
 typescript/no-inferrable-types	no	n/a

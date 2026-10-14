@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Built and tested against oxlint 1.88, oxlint-tsgolint 7.0.2004 and oxfmt 0.73. The rule inventories under `docs/` now include `typescript/no-generated-empty-object-type` and oxfmt's `associations`, `astro` and `experimentalOperatorPosition` options.
+- `@entro314labs/oxlint-audit-plugins` depends on `@oxlint/plugins` 1.88 and requires Node.js 24.21 or later.
+
 ## [1.5.0] - 2026-09-08
 
 ### Added

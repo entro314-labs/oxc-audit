@@ -331,6 +331,7 @@ no-focused-tests	jest
 no-focused-tests	vitest
 no-for-in-array	typescript
 no-func-assign	eslint
+no-generated-empty-object-type	typescript
 no-global-assign	eslint
 no-head-element	nextjs
 no-head-import-in-document	nextjs

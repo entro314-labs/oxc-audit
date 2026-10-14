@@ -11,6 +11,7 @@ no-deprecated	implemented	typescript/no-deprecated
 no-duplicate-type-constituents	implemented	typescript/no-duplicate-type-constituents
 no-floating-promises	implemented	typescript/no-floating-promises
 no-for-in-array	implemented	typescript/no-for-in-array
+no-generated-empty-object-type	implemented	typescript/no-generated-empty-object-type
 no-implied-eval	implemented	typescript/no-implied-eval
 no-meaningless-void-operator	implemented	typescript/no-meaningless-void-operator
 no-misused-promises	implemented	typescript/no-misused-promises

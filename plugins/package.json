@@ -30,19 +30,19 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@oxlint/plugins": "^1.81.0"
+		"@oxlint/plugins": "^1.88.0"
 	},
 	"devDependencies": {
-		"@types/node": "^26.2.0",
-		"oxlint": "^1.81.0",
-		"oxlint-tsgolint": "^7.0.2001",
-		"tsdown": "^0.22.14",
-		"tsx": "^4.23.12",
+		"@types/node": "^26.6.5",
+		"oxlint": "^1.88.0",
+		"oxlint-tsgolint": "^7.0.2004",
+		"tsdown": "^0.23.1",
+		"tsx": "^4.23.15",
 		"typescript": "next"
 	},
-	"packageManager": "pnpm@11.22.0",
+	"packageManager": "pnpm@11.28.5",
 	"license": "MIT",
 	"engines": {
-		"node": ">=20.19.0"
+		"node": ">=24.21.0"
 	}
 }
