@@ -3,8 +3,14 @@ import { resolve } from 'node:path'
 
 import { parse as parseJsonc, printParseErrorCode } from 'jsonc-parser'
 import type { ParseError as JsoncParseError } from 'jsonc-parser'
+import { parse as parseYaml } from 'yaml'
 
-import { fromBiome, fromPrettier } from './format-recommender.js'
+import {
+  fromBiome,
+  fromPrettier,
+  prettierLeftovers,
+  withSourceDefaults,
+} from './format-recommender.js'
 import type { ExistingFormatterConfig } from './format-recommender.js'
 import { pathExists } from './fs-utils.js'
 import type { OxfmtConfig, Reporter } from './types.js'
@@ -13,19 +19,24 @@ import type { OxfmtConfig, Reporter } from './types.js'
 export const OXFMT_CONFIG_NAMES = ['.oxfmtrc.jsonc', '.oxfmtrc.json', 'oxfmtrc.json']
 
 /**
- * Prettier config files this tool can read.
+ * Prettier config files this tool can read, in Prettier's own lookup order after the
+ * `prettier` key of package.json.
  *
  * Only the declarative forms. `.prettierrc.js` and `prettier.config.mjs` are code, and
  * running a project's config file to find out how it formats is not something an audit
- * should do; those are reported as unreadable instead.
+ * should do; those are reported as unreadable instead, as is TOML, which nothing here
+ * parses. `.prettierrc` may hold JSON or YAML.
  */
 const PRETTIER_CONFIG_NAMES = [
   '.prettierrc',
   '.prettierrc.json',
+  '.prettierrc.yaml',
+  '.prettierrc.yml',
   '.prettierrc.jsonc',
   '.prettierrc.json5',
 ]
-const PRETTIER_EXECUTABLE_NAMES = [
+const PRETTIER_UNREADABLE_NAMES = [
+  '.prettierrc.toml',
   '.prettierrc.js',
   '.prettierrc.cjs',
   '.prettierrc.mjs',
@@ -110,6 +121,97 @@ export async function findExistingFormatterConfig(
   projectDir: string,
   reporter: Reporter,
 ): Promise<ExistingFormatterConfig | undefined> {
+  const found = await findSourceFormatterConfig(projectDir, reporter)
+
+  if (found === undefined) {
+    return undefined
+  }
+
+  return withSourceDefaults(found, {
+    editorconfigSetsWidth: await editorconfigSetsWidth(projectDir),
+  })
+}
+
+async function editorconfigSetsWidth(projectDir: string): Promise<boolean> {
+  const path = resolve(projectDir, '.editorconfig')
+
+  return (await pathExists(path)) && /^\s*max_line_length\s*=/mu.test(await readFile(path, 'utf-8'))
+}
+
+/** A Prettier config, reporting what it holds that oxfmt cannot carry. */
+function fromPrettierReporting(
+  config: Record<string, unknown>,
+  name: string,
+  reporter: Reporter,
+): ExistingFormatterConfig {
+  const leftovers = prettierLeftovers(config)
+
+  if (leftovers.length > 0) {
+    reporter.warn(
+      `${name} has settings with no oxfmt equivalent, which were not carried across: ${leftovers.join(', ')}.`,
+    )
+  }
+
+  return { source: 'prettier', settings: fromPrettier(config) }
+}
+
+/**
+ * `.prettierrc` is JSON or YAML; JSON with comments is tried first, since YAML would read
+ * a `//` comment as text.
+ */
+async function readPrettierObject(path: string): Promise<Record<string, unknown> | undefined> {
+  if (/\.ya?ml$/u.test(path)) {
+    return asObject(parseYaml(await readFile(path, 'utf-8')), path)
+  }
+
+  if (!path.endsWith('.prettierrc')) {
+    return readJsoncObject(path)
+  }
+
+  try {
+    return await readJsoncObject(path)
+  } catch {
+    return asObject(parseYaml(await readFile(path, 'utf-8')), path)
+  }
+}
+
+function asObject(parsed: unknown, path: string): Record<string, unknown> | undefined {
+  if (parsed === undefined || parsed === null) {
+    return undefined
+  }
+
+  if (typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new TypeError(`${path} must contain an object at the top level.`)
+  }
+
+  return parsed as Record<string, unknown>
+}
+
+async function findSourceFormatterConfig(
+  projectDir: string,
+  reporter: Reporter,
+): Promise<ExistingFormatterConfig | undefined> {
+  const manifestPath = resolve(projectDir, 'package.json')
+
+  if (await pathExists(manifestPath)) {
+    // A manifest that does not parse is the stack detector's to report; here it only means
+    // there is no `prettier` key to read.
+    const prettier = (await readJsoncObject(manifestPath).catch(() => undefined))?.prettier
+
+    if (typeof prettier === 'string') {
+      reporter.warn(
+        `package.json points Prettier at the shared config ${prettier}, which this tool does not resolve. Its settings were not carried into the oxfmt config - copy them by hand.`,
+      )
+      return undefined
+    }
+
+    const config = asObject(prettier, `${manifestPath}#prettier`)
+
+    if (config) {
+      return fromPrettierReporting(config, 'The prettier key of package.json', reporter)
+    }
+  }
+
   for (const name of PRETTIER_CONFIG_NAMES) {
     const candidate = resolve(projectDir, name)
 
@@ -118,10 +220,10 @@ export async function findExistingFormatterConfig(
     }
 
     try {
-      const parsed = await readJsoncObject(candidate)
+      const parsed = await readPrettierObject(candidate)
 
       if (parsed) {
-        return { source: 'prettier', settings: fromPrettier(parsed) }
+        return fromPrettierReporting(parsed, name, reporter)
       }
     } catch (err) {
       reporter.warn(
@@ -130,10 +232,10 @@ export async function findExistingFormatterConfig(
     }
   }
 
-  for (const name of PRETTIER_EXECUTABLE_NAMES) {
+  for (const name of PRETTIER_UNREADABLE_NAMES) {
     if (await pathExists(resolve(projectDir, name))) {
       reporter.warn(
-        `${name} is a JavaScript module, which this tool does not execute. Its settings were not carried into the oxfmt config - copy them by hand.`,
+        `${name} is ${name.endsWith('.toml') ? 'TOML' : 'a JavaScript module'}, which this tool does not ${name.endsWith('.toml') ? 'parse' : 'execute'}. Its settings were not carried into the oxfmt config - copy them by hand.`,
       )
       return undefined
     }
@@ -150,6 +252,12 @@ export async function findExistingFormatterConfig(
       const parsed = await readJsoncObject(candidate)
 
       if (parsed) {
+        if (asObject(parsed.formatter, name)?.lineEnding === 'auto') {
+          reporter.warn(
+            `${name} sets lineEnding to auto, which oxfmt does not support. It was not carried across; oxfmt writes lf unless told otherwise.`,
+          )
+        }
+
         return { source: 'biome', settings: fromBiome(parsed) }
       }
     } catch (err) {

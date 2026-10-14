@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
 import { mergeFormatterConfig } from './format-config-loader.js'
-import { fromBiome, fromPrettier, recommendFormatterConfig } from './format-recommender.js'
+import {
+  fromBiome,
+  fromPrettier,
+  prettierLeftovers,
+  recommendFormatterConfig,
+} from './format-recommender.js'
 import { withForcedSignals } from './stack-detector.js'
 import type { ProjectStack } from './types.js'
 
@@ -22,9 +27,31 @@ describe('carrying settings across from Prettier', () => {
   })
 
   it('drops keys oxfmt has no equivalent for rather than guessing one', () => {
-    const settings = fromPrettier({ semi: true, plugins: ['prettier-plugin-tailwindcss'] })
+    const config = { semi: true, plugins: ['prettier-plugin-svelte'], requirePragma: true }
 
-    expect(settings).toEqual({ semi: true })
+    expect(fromPrettier(config)).toEqual({ semi: true })
+    expect(prettierLeftovers(config)).toEqual(['requirePragma', 'plugin prettier-plugin-svelte'])
+  })
+
+  it('turns the Tailwind plugin into the sorting oxfmt implements, options included', () => {
+    expect(fromPrettier({ plugins: ['prettier-plugin-tailwindcss'] })).toEqual({
+      sortTailwindcss: true,
+    })
+    expect(
+      fromPrettier({
+        plugins: ['prettier-plugin-tailwindcss'],
+        tailwindFunctions: ['cn', 'cva'],
+        tailwindStylesheet: './src/app.css',
+      }),
+    ).toEqual({ sortTailwindcss: { functions: ['cn', 'cva'], stylesheet: './src/app.css' } })
+  })
+
+  it('leaves endOfLine auto behind, which oxfmt rejects along with the whole file', () => {
+    const config = { endOfLine: 'auto', semi: false }
+
+    expect(fromPrettier(config)).toEqual({ semi: false })
+    expect(prettierLeftovers(config)).toEqual(['endOfLine: auto'])
+    expect(fromBiome({ formatter: { lineEnding: 'auto' } })).toEqual({})
   })
 
   it('carries a falsy value rather than treating it as absent', () => {

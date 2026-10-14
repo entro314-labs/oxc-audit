@@ -166,11 +166,16 @@ present is a decision and is never overwritten, so a second run is a no-op.
 
 An existing Prettier or Biome config wins over every default - the codebase is already
 formatted that way, and imposing different settings would rewrite every file on the first
-run. Biome's spellings are translated (`indentStyle` → `useTabs`, `lineWidth` →
-`printWidth`, `quoteStyle` → `singleQuote`). Keys with no oxfmt equivalent are left behind
-rather than guessed at, and a `prettier.config.js` is reported rather than executed -
-running a project's config file to find out how it formats is not something an audit should
-do.
+run. For the same reason the source formatter's own defaults are pinned where oxfmt's differ:
+`printWidth: 80` (oxfmt wraps at 100) unless `.editorconfig` sets `max_line_length`, and
+`useTabs: true` for Biome. Prettier is read from the `prettier` key of `package.json` or a
+JSON, JSONC or YAML `.prettierrc*`; `prettier-plugin-tailwindcss` becomes oxfmt's
+`sortTailwindcss`, with its options. Biome's spellings are translated (`indentStyle` →
+`useTabs`, `lineWidth` → `printWidth`, `quoteStyle` → `singleQuote`). Keys with no oxfmt
+equivalent - other plugins, `endOfLine: "auto"`, which oxfmt rejects - are reported and left
+behind rather than guessed at, and a `prettier.config.js` or `.prettierrc.toml` is reported
+rather than read - running a project's config file to find out how it formats is not
+something an audit should do.
 
 ## Configuration findings
 

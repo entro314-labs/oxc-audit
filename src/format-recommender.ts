@@ -15,6 +15,7 @@ const PRETTIER_KEYS = [
   'bracketSpacing',
   'embeddedLanguageFormatting',
   'endOfLine',
+  'experimentalOperatorPosition',
   'htmlWhitespaceSensitivity',
   'jsxSingleQuote',
   'objectWrap',
@@ -75,6 +76,27 @@ const BIOME_QUOTE_PROPERTIES: Record<string, string> = {
   preserve: 'preserve',
 }
 
+/**
+ * Line endings oxfmt accepts. Prettier and Biome also accept `auto`, which oxfmt rejects
+ * along with the rest of the file ("unknown variant `auto`"), so it is never carried.
+ */
+const OXFMT_LINE_ENDINGS = new Set(['lf', 'crlf', 'cr'])
+
+/**
+ * `prettier-plugin-tailwindcss` options, and the oxfmt `sortTailwindcss` key each becomes.
+ * oxfmt implements the plugin's sorting itself and drops the `tailwind` prefix.
+ */
+const TAILWIND_PLUGIN_KEYS: Record<string, string> = {
+  tailwindAttributes: 'attributes',
+  tailwindConfig: 'config',
+  tailwindFunctions: 'functions',
+  tailwindPreserveDuplicates: 'preserveDuplicates',
+  tailwindPreserveWhitespace: 'preserveWhitespace',
+  tailwindStylesheet: 'stylesheet',
+}
+
+const TAILWIND_PLUGIN = 'prettier-plugin-tailwindcss'
+
 /** Translate a Prettier config into the oxfmt keys that mean the same thing. */
 export function fromPrettier(config: Record<string, unknown>): OxfmtConfig {
   const settings: Record<string, unknown> = {}
@@ -82,12 +104,85 @@ export function fromPrettier(config: Record<string, unknown>): OxfmtConfig {
   for (const key of PRETTIER_KEYS) {
     const value = config[key satisfies PrettierKey]
 
-    if (value !== undefined) {
-      settings[key] = value
+    if (value === undefined) {
+      continue
     }
+
+    if (key === 'endOfLine' && !OXFMT_LINE_ENDINGS.has(String(value))) {
+      continue
+    }
+
+    settings[key] = value
+  }
+
+  if (prettierPlugins(config).includes(TAILWIND_PLUGIN)) {
+    const tailwind: Record<string, unknown> = {}
+
+    for (const [prettierKey, oxfmtKey] of Object.entries(TAILWIND_PLUGIN_KEYS)) {
+      if (config[prettierKey] !== undefined) {
+        tailwind[oxfmtKey] = config[prettierKey]
+      }
+    }
+
+    settings.sortTailwindcss = Object.keys(tailwind).length > 0 ? tailwind : true
   }
 
   return settings
+}
+
+function prettierPlugins(config: Record<string, unknown>): string[] {
+  return Array.isArray(config.plugins)
+    ? config.plugins.filter((plugin): plugin is string => typeof plugin === 'string')
+    : []
+}
+
+/**
+ * The parts of a Prettier config {@link fromPrettier} leaves behind, for reporting: keys
+ * with no oxfmt counterpart, plugins other than the Tailwind one oxfmt implements, and an
+ * `endOfLine` oxfmt rejects.
+ */
+export function prettierLeftovers(config: Record<string, unknown>): string[] {
+  const carried = new Set<string>([...PRETTIER_KEYS, 'plugins', '$schema'])
+
+  if (prettierPlugins(config).includes(TAILWIND_PLUGIN)) {
+    for (const key of Object.keys(TAILWIND_PLUGIN_KEYS)) carried.add(key)
+  }
+
+  return [
+    ...Object.keys(config).filter((key) => !carried.has(key)),
+    ...prettierPlugins(config)
+      .filter((plugin) => plugin !== TAILWIND_PLUGIN)
+      .map((plugin) => `plugin ${plugin}`),
+    ...(config.endOfLine !== undefined && !OXFMT_LINE_ENDINGS.has(String(config.endOfLine))
+      ? [`endOfLine: ${String(config.endOfLine)}`]
+      : []),
+  ]
+}
+
+/**
+ * The defaults the source formatter applied that oxfmt does not share, for every setting
+ * the source config left unset.
+ *
+ * Without these, a project formatted by Prettier's or Biome's defaults is reformatted
+ * wholesale on the first oxfmt run: oxfmt wraps at 100 columns where both wrap at 80, and
+ * Biome indents with tabs. A `max_line_length` in `.editorconfig` is read by Prettier and
+ * oxfmt alike, so the width is pinned only when there is none.
+ */
+export function withSourceDefaults(
+  existing: ExistingFormatterConfig,
+  options: { editorconfigSetsWidth: boolean },
+): ExistingFormatterConfig {
+  const settings = { ...existing.settings }
+
+  if (!options.editorconfigSetsWidth) {
+    settings.printWidth ??= 80
+  }
+
+  if (existing.source === 'biome') {
+    settings.useTabs ??= true
+  }
+
+  return { ...existing, settings }
 }
 
 /** Translate the formatter half of a Biome config into oxfmt keys. */
@@ -102,7 +197,9 @@ export function fromBiome(config: {
   if (shared?.indentStyle !== undefined) settings.useTabs = shared.indentStyle === 'tab'
   if (shared?.indentWidth !== undefined) settings.tabWidth = shared.indentWidth
   if (shared?.lineWidth !== undefined) settings.printWidth = shared.lineWidth
-  if (shared?.lineEnding !== undefined) settings.endOfLine = shared.lineEnding
+  if (shared?.lineEnding !== undefined && OXFMT_LINE_ENDINGS.has(shared.lineEnding)) {
+    settings.endOfLine = shared.lineEnding
+  }
 
   if (javascript?.quoteStyle !== undefined)
     settings.singleQuote = javascript.quoteStyle === 'single'
@@ -152,5 +249,5 @@ export function recommendFormatterConfig(
 
 /** Every oxfmt key this tool can write, for the inventory conformance check. */
 export function getRecommendableFormatterKeys(): string[] {
-  return [...PRETTIER_KEYS, 'sortImports', 'sortPackageJson']
+  return [...PRETTIER_KEYS, 'sortImports', 'sortPackageJson', 'sortTailwindcss']
 }

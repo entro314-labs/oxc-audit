@@ -15,8 +15,14 @@ All notable changes to this project will be documented in this file.
 - With type-aware rules on and Vitest or Jest present, the config adds an override that turns the `typescript/no-unsafe-*` rules off in test files (`*.test.*`, `*.spec.*`, `__tests__/`, `tests/`, `test/`). Mocks are `any` by construction, and on the projects measured, test files produced over 90% of these rules' findings. Source files keep them. The override is not added when the project already set one of those rules itself.
 - `--ts-config` creates `oxlint.config.ts` (`export default defineConfig({...})`) instead of `.oxlintrc.json` when the project has no Oxlint config. An existing `oxlint.config.ts` or `.mts` is now audited and updated in place, where previously any module config blocked the run. A module config that does more than export a plain object (other imports, `extends`, computed values) is reported but not rewritten.
 
+### Fixed
+
+- A Prettier `endOfLine: "auto"` or Biome `lineEnding: "auto"` was copied into `.oxfmtrc.jsonc`, which oxfmt refuses to load, so every `format` and `format:check` run failed. It is left behind and reported.
+- A project formatted with Prettier's or Biome's defaults was reformatted wholesale on the first oxfmt run, because oxfmt wraps at 100 columns where both wrap at 80, and Biome indents with tabs. Those defaults are now pinned when the source config leaves them unset and `.editorconfig` sets no `max_line_length`.
+
 ### Changed
 
+- Prettier settings are also read from the `prettier` key of `package.json` and from a YAML `.prettierrc`, `.prettierrc.yaml` or `.prettierrc.yml`. `prettier-plugin-tailwindcss` and its `tailwind*` options become oxfmt's `sortTailwindcss`, and `experimentalOperatorPosition` is carried. Settings that cannot be carried, and a `.prettierrc.toml`, are reported instead of dropped silently.
 - The type-aware rules no longer name `typescript/prefer-optional-chain` or `typescript/no-unnecessary-condition`. Both are in Oxlint's unstable `nursery` category, which this tool otherwise never enables, and naming a rule runs it whatever its category. A test now checks that no recommended rule is in `nursery`.
 - `typescript/non-nullable-type-assertion-style` is no longer recommended at `--strict`. It rewrites `x as T` to `x!`, which `typescript/no-non-null-assertion` in the same config then reports.
 - `typescript/strict-void-return` is no longer named at `recommended`, where it reported `promisify(execFile)` and every `onClick` handler that returns a value. Oxlint's `pedantic` category still enables it from `--strict`.
