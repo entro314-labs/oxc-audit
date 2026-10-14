@@ -11,6 +11,7 @@ import {
 } from './fs-utils.js'
 import type { Evidence, ProjectStack, Reporter, StackSignal, StackSignalId } from './types.js'
 import { compareVersions, minimumVersionOf } from './versions.js'
+import { readWorkspaceDeclaration } from './workspace-globs.js'
 
 /** Directories never worth walking; skipping them keeps the scan bounded and fast. */
 const SKIPPED_DIRECTORIES = new Set([
@@ -65,7 +66,7 @@ const PackageManifestSchema = z
     devDependencies: z.record(z.string(), z.string()).optional(),
     peerDependencies: z.record(z.string(), z.string()).optional(),
   })
-  .passthrough()
+  .loose()
 
 type PackageManifest = z.infer<typeof PackageManifestSchema>
 
@@ -89,7 +90,9 @@ const CONFIG_FILE_SIGNALS: Array<{ id: StackSignalId; files: string[] }> = [
   { id: 'jest', files: ['jest.config.js', 'jest.config.ts', 'jest.config.mjs', 'jest.config.cjs'] },
   // `package.json#workspaces` is only one of several conventions; pnpm, Lerna and Nx each
   // declare a workspace somewhere else entirely.
-  { id: 'monorepo', files: ['pnpm-workspace.yaml', 'pnpm-workspace.yml', 'lerna.json', 'nx.json'] },
+  // `pnpm-workspace.yaml` is not here: pnpm 10+ also keeps settings in it, so a
+  // single-package project can carry one. It counts only with a `packages` list.
+  { id: 'monorepo', files: ['lerna.json', 'nx.json'] },
 ]
 
 /** Dependency names that establish a signal, matched exactly. */
@@ -166,6 +169,12 @@ export async function detectStack(
   collectDependencySignals(manifest, addEvidence)
   collectManifestFieldSignals(manifest, addEvidence)
   await collectConfigFileSignals(resolvedDir, addEvidence)
+
+  const workspace = await readWorkspaceDeclaration(resolvedDir)
+
+  if (workspace?.source.startsWith('pnpm-workspace') === true) {
+    addEvidence('monorepo', { kind: 'config-file', value: `${workspace.source}#packages` })
+  }
 
   const scan = await scanSourceTree(resolvedDir, options.maxFiles ?? DEFAULT_MAX_FILES)
   collectExtensionSignals(scan.extensions, addEvidence)

@@ -205,6 +205,19 @@ describe('detectStack - workspace roots', () => {
     expect(hasSignal(stack, 'monorepo')).toBe(true)
   })
 
+  it('ignores a pnpm-workspace.yaml that holds only settings', async () => {
+    const dir = await setupProject({
+      'package.json': JSON.stringify({ name: 'app' }),
+      'pnpm-workspace.yaml': 'minimumReleaseAge: 1440\nallowBuilds:\n  esbuild: true\n',
+    })
+    const reporter = new CollectingReporter()
+
+    const stack = await detectStack(dir, reporter)
+
+    expect(hasSignal(stack, 'monorepo')).toBe(false)
+    expect(reporter.getWarnings().some((warning) => warning.includes('workspace root'))).toBe(false)
+  })
+
   it('detects Lerna and Nx workspaces', async () => {
     for (const marker of ['lerna.json', 'nx.json']) {
       const dir = await setupProject({
