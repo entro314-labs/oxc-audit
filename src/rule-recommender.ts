@@ -184,6 +184,8 @@ const TARGETED_RULES: Array<{
    * recommended, this rule is not: the two would contradict each other.
    */
   supersededBy?: string
+  /** Rule options, written only when the config does not already name the rule. */
+  options?: unknown[]
   reason: string
 }> = [
   {
@@ -266,6 +268,72 @@ const TARGETED_RULES: Array<{
     requires: ['react-jsx-runtime'],
     reason:
       'The automatic JSX runtime imports `react/jsx-runtime` itself, so requiring `React` in scope reports every component for a binding that is never used.',
+  },
+  {
+    // On at `error` from `correctness` already; named for its options. Oxlint ignores
+    // `_`-prefixed arguments by default but drops that default as soon as any option is set,
+    // and never ignores a bare `_` in `[_, value]`, the idiom for skipping a tuple slot.
+    // Unused imports are removed by `--fix`: Oxlint classes that fix as safe.
+    rule: 'no-unused-vars',
+    level: 'basic',
+    severity: 'error',
+    requires: [],
+    options: [
+      {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+        destructuredArrayIgnorePattern: '^_',
+        ignoreRestSiblings: true,
+        fix: { imports: 'safe-fix', variables: 'suggestion' },
+      },
+    ],
+    reason:
+      'Unused code, with the `_` prefix honoured everywhere as the way to mark something unused on purpose, and unused imports removed by --fix.',
+  },
+  {
+    // Both test runners name a suite after a function or class - `describe(parseConfig, ...)`
+    // - which the rule otherwise reports as a non-string title.
+    rule: 'vitest/valid-title',
+    level: 'basic',
+    severity: 'error',
+    requires: ['vitest'],
+    options: [{ ignoreTypeOfDescribeName: true }],
+    reason: 'A malformed test title, allowing a function or class as a suite name.',
+  },
+  {
+    rule: 'jest/valid-title',
+    level: 'basic',
+    severity: 'error',
+    requires: ['jest'],
+    options: [{ ignoreTypeOfDescribeName: true }],
+    reason: 'A malformed test title, allowing a function or class as a suite name.',
+  },
+  {
+    // On from `suspicious`; named for its options. These modules exist to be imported for
+    // their effect alone - `server-only` is how a Next.js module refuses to reach the client.
+    rule: 'import/no-unassigned-import',
+    level: 'recommended',
+    severity: 'warn',
+    requires: ['esm', 'typescript'],
+    options: [
+      {
+        allow: [
+          '**/*.css',
+          '**/*.scss',
+          '**/*.sass',
+          '**/*.less',
+          'server-only',
+          'client-only',
+          'dotenv/config',
+          'reflect-metadata',
+          '@testing-library/jest-dom',
+          '@testing-library/jest-dom/*',
+        ],
+      },
+    ],
+    reason:
+      'An import kept only for its side effects, allowing stylesheets and the modules that exist to be imported that way.',
   },
   {
     rule: 'typescript/no-explicit-any',
@@ -580,6 +648,7 @@ const TYPE_AWARE_RULES: Array<{
   severity: OxlintSeverity
   level: AuditLevel
   domains?: AuditDomain[]
+  options?: unknown[]
   reason: string
 }> = [
   {
@@ -595,9 +664,13 @@ const TYPE_AWARE_RULES: Array<{
     reason: 'Awaiting a non-promise is always a mistake and usually hides a missing call.',
   },
   {
+    // JSX attributes are exempt. `onClick={async () => ...}` is how React handlers are
+    // written, React ignores the returned promise by design, and every finding the rule made
+    // across real Next.js projects was one of these.
     rule: 'typescript/no-misused-promises',
     severity: 'error',
     level: 'recommended',
+    options: [{ checksVoidReturn: { attributes: false } }],
     reason: 'Passing an async function where a void callback is expected drops its errors.',
   },
   {
@@ -1216,6 +1289,7 @@ export function recommendForStack(
       kind: 'rule',
       target: entry.rule,
       severity: entry.severity,
+      ...(entry.options && { options: entry.options }),
       reason: entry.reason,
       triggeredBy,
     })
@@ -1241,6 +1315,7 @@ export function recommendForStack(
         kind: 'rule',
         target: entry.rule,
         severity: entry.severity,
+        ...(entry.options && { options: entry.options }),
         reason: entry.reason,
         triggeredBy: ['tsgolint'],
       })

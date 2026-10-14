@@ -7,6 +7,11 @@ All notable changes to this project will be documented in this file.
 ### Added
 
 - The config now declares `env.browser` for code that renders in a browser (React DOM, Next.js, Vue, Svelte, Astro, Vite) and `env.node` for code that runs on Node. Without them `no-implied-eval` - recommended at every level for security - never fired on a bare `setTimeout("...")`, and `no-global-assign` did not protect `window` or `process`. An explicit `false` is left alone.
+- Recommended rules now carry options that remove findings measured as noise across real projects, written only when the config does not already name the rule:
+  - `typescript/no-misused-promises` exempts JSX attributes, so `onClick={async () => ...}` is no longer reported.
+  - `no-unused-vars` honours the `_` prefix for arguments, variables, caught errors and array-destructuring slots (`[_, value]`), and removes unused imports under `--fix`.
+  - `vitest/valid-title` and `jest/valid-title` accept a function or class as a suite name.
+  - `import/no-unassigned-import` allows stylesheets and modules imported only for their effect, such as `server-only` and `dotenv/config`.
 - `--ts-config` creates `oxlint.config.ts` (`export default defineConfig({...})`) instead of `.oxlintrc.json` when the project has no Oxlint config. An existing `oxlint.config.ts` or `.mts` is now audited and updated in place, where previously any module config blocked the run. A module config that does more than export a plain object (other imports, `extends`, computed values) is reported but not rewritten.
 
 ### Changed

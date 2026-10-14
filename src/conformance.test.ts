@@ -191,6 +191,40 @@ const FRAMEWORK_FIXTURES = [
   },
 ] as const
 
+describe('rule options', () => {
+  it('keeps the `_` conventions and test titles that name a function quiet', async () => {
+    const dir = await setupProject({
+      ...REACT_PROJECT,
+      'src/a.ts':
+        'export const pairs = [[1, 2]].map(([_, v]) => v)\n' +
+        'export function f(_unused: number, used: number) {\n  return used\n}\n',
+      'src/a.test.ts':
+        'import { describe, it } from "vitest"\n' +
+        'import { f } from "./a.ts"\n' +
+        'describe(f, () => {\n  it("adds", () => {})\n})\n',
+    })
+
+    await audit({ projectDir: dir, write: true })
+    const { stdout } = await run(['--config', '.oxlintrc.json', 'src'], dir)
+
+    expect(stdout).not.toContain('no-unused-vars')
+    expect(stdout).not.toContain('valid-title')
+  })
+
+  it('removes an unused import under --fix', async () => {
+    const dir = await setupProject({
+      ...REACT_PROJECT,
+      'src/m.ts': 'export const a = 1\nexport const b = 2\n',
+      'src/a.ts': 'import { a, b } from "./m.ts"\nexport const x = a\n',
+    })
+
+    await audit({ projectDir: dir, write: true })
+    await run(['--config', '.oxlintrc.json', '--fix', 'src/a.ts'], dir)
+
+    expect(await readFile(join(dir, 'src/a.ts'), 'utf-8')).toContain('import { a } from')
+  })
+})
+
 describe('environments', () => {
   it('lets no-implied-eval see a bare setTimeout once the environment is declared', async () => {
     const dir = await setupProject({
@@ -286,6 +320,26 @@ describe('type-aware linting', () => {
     // Proves the engine resolved and the rule ran, not just that the JSON looked right.
     expect(output).not.toContain('Failed to find tsgolint')
     expect(output).toContain('await-thenable')
+  })
+
+  it('leaves async JSX handlers alone while still catching a misused promise elsewhere', async () => {
+    const dir = await setupProject({
+      ...TYPE_AWARE_PROJECT,
+      'tsconfig.json': JSON.stringify({ compilerOptions: { strict: true, jsx: 'preserve' } }),
+      'src/a.ts': 'export async function save(): Promise<void> {}\n',
+      'src/b.tsx':
+        'import { save } from "./a.ts"\n' +
+        'declare function Button(props: { onClick: () => void }): null\n' +
+        'export const B = <Button onClick={async () => save()} />\n' +
+        'export function c() {\n  if (save()) return 1\n  return 0\n}\n',
+    })
+
+    await audit({ projectDir: dir, write: true })
+    const { stdout } = await run(['--config', '.oxlintrc.json', '--type-aware', 'src'], dir)
+    const misused = stdout.split('\n').filter((line) => line.includes('no-misused-promises'))
+
+    expect(misused).toHaveLength(1)
+    expect(misused[0]).toContain('b.tsx:5')
   })
 
   it('reports type-aware as a prerequisite instead of configuring it when the engine is absent', async () => {
