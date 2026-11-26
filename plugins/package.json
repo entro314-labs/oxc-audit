@@ -30,13 +30,13 @@
 		"typecheck": "tsc --noEmit"
 	},
 	"dependencies": {
-		"@oxlint/plugins": "^1.88.0"
+		"@oxlint/plugins": "^1.95.0"
 	},
 	"devDependencies": {
-		"@types/node": "^26.6.5",
-		"oxlint": "^1.88.0",
-		"oxlint-tsgolint": "^7.0.2004",
-		"tsdown": "^0.23.1",
+		"@types/node": "^26.6.11",
+		"oxlint": "^1.95.0",
+		"oxlint-tsgolint": "^7.0.2008",
+		"tsdown": "^0.23.7",
 		"tsx": "^4.23.15",
 		"typescript": "next"
 	},
